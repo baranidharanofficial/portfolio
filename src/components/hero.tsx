@@ -16,12 +16,24 @@ const ICON_FADE = 0.14;
  *  ordering is what lets a single count decide which have landed.
  *  On a phone all four sit in the empty band above the name, because the grown
  *  portrait spans the full width down there.
- *  `tilt` is degrees, and it decides the hover card too: the card takes the same
- *  angle and hangs off the side the icon leans towards — negative tilt dips the
- *  icon's left side, so the card hangs left. Keep each tilt's sign matching the
- *  side of the screen the icon sits on, or its card will lean off the edge.
- *  Years are first-release dates from the App Store listings. */
-const APPS = [
+ *  `tilt` is degrees, and its sign picks the side the hover card hangs off:
+ *  negative dips the icon's left side, so the card hangs left. Keep each tilt's
+ *  sign matching the side of the screen the icon sits on, or its card will hang
+ *  off the edge. The card itself is never rotated — it is a bitmap frame.
+ *  Years are first-release dates from the App Store listings.
+ *  `crowned` marks the flagship — set it on one app, or the crown stops meaning
+ *  anything. The type is spelled out so the optional field exists on every entry
+ *  rather than only on the one that sets it. */
+const APPS: {
+  slug: string;
+  name: string;
+  desc: string;
+  year: string;
+  at: number;
+  tilt: number;
+  place: string;
+  crowned?: boolean;
+}[] = [
   {
     slug: "readio",
     name: "Readio AI",
@@ -57,8 +69,20 @@ const APPS = [
     at: 0.62,
     tilt: 9,
     place: "right-[16%] top-[30%] sm:right-[12%] sm:top-auto sm:bottom-[14%]",
+    crowned: true,
   },
 ];
+
+/** Marks the flagship app. The emoji itself, not artwork — it inherits whatever
+ *  crown the reader's platform ships, which is the point: it always looks native
+ *  to their OS. Sized and placed in globals.css. */
+function Crown() {
+  return (
+    <span aria-hidden className="app-crown">
+      👑
+    </span>
+  );
+}
 
 export function Hero() {
   const [revealed, setRevealed] = useState(false);
@@ -127,8 +151,13 @@ export function Hero() {
       className="stage absolute inset-0"
     >
       {/* Background layer: behind the type and the portrait, above the wash.
-          The layer itself never takes pointer events — only landed icons do. */}
-      <div className="pointer-events-none absolute inset-0 z-0">
+          The layer itself never takes pointer events — only landed icons do.
+          Carries no z-index on purpose: a z-index here would make this a
+          stacking context and trap the hover cards inside it, under the portrait.
+          Without one, the icons still paint below the type and the portrait —
+          they are auto-level and come first in the DOM — while .app-card can
+          raise itself above both. Nothing in this subtree may take a z-index. */}
+      <div className="pointer-events-none absolute inset-0">
         {APPS.map((app, i) => (
           <div
             key={app.slug}
@@ -141,8 +170,11 @@ export function Hero() {
             tabIndex={0}
           >
             {/* The icon carries the scroll-driven reveal; the card is its
-                sibling so it inherits neither the tilt nor the scale. */}
+                sibling so it inherits neither the tilt nor the scale. The crown
+                is inside it, so it does inherit both — it arrives with the app
+                it belongs to and leans at the same angle. */}
             <div className="app-icon">
+              {app.crowned && <Crown />}
               <Image
                 src={`/${app.slug}.png`}
                 alt=""
@@ -175,7 +207,7 @@ export function Hero() {
             >
               <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
               <p className="font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/55 sm:text-xs">
-                Scroll to Know More About me
+                Scroll to Know More
               </p>
               <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
             </div>
@@ -208,13 +240,17 @@ export function Hero() {
         <div className="portrait-grow">
           <div className="portrait-in relative">
             <span className="portrait-glow" />
+            {/* sizes mirrors --target in globals.css — the width the portrait
+                is laid out at, which is the width it reaches fully grown. A
+                narrower hint would fetch a file the grown portrait outruns. */}
             <Image
               src="/hero.png"
               alt=""
-              width={500}
-              height={500}
+              width={1254}
+              height={1254}
               loading="eager"
-              sizes="50vw"
+              sizes="min(115vh, max(50vw, 55vh))"
+              quality={90}
               className="portrait-img h-auto w-full"
             />
           </div>

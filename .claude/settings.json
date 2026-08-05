@@ -58,7 +58,18 @@
       "Bash(node hover-probe.mjs 390 844)",
       "Bash(curl -s -o /dev/null -w \"cdp=%{http_code}\\\\n\" http://127.0.0.1:9222/json/version)",
       "Bash(node hover-shot.mjs 1440 900 0 1 t-d-readio.png)",
-      "Bash(node hover-shot.mjs 1440 900 3 1 t-d-travafa.png)"
+      "Bash(node hover-shot.mjs 1440 900 3 1 t-d-travafa.png)",
+      "Bash(git ls-remote *)",
+      "Bash(git remote *)",
+      "Bash(npx eslint *)",
+      "Bash(command -v rsvg-convert qlmanage)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=2 --window-size=500,220 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown.html)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=2 --window-size=640,400 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown2.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown2.html)",
+      "Bash(sed -i '' 's/width:60%/width:66%/; s/translate\\(-50%,14%\\)/translate\\(-50%,16%\\)/' /private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown2.html)",
+      "Bash(sed -i '' 's/a.innerHTML = mk\\(104, 9\\); b.innerHTML = mk\\(48, 9\\); c.innerHTML = mk\\(260, 0\\);/a.innerHTML = mk\\(104, 9\\); b.innerHTML = mk\\(72, 9\\); c.innerHTML = mk\\(48, 9\\);/' /private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown2.html)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=3 --window-size=380,200 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown3.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown2.html)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=3 --window-size=470,200 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown4.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown4.html)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=3 --window-size=560,230 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown5.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown5.html)"
     ]
   }
 }

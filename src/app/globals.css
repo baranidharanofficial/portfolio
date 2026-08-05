@@ -112,13 +112,17 @@ body {
 /* The slot holds the icon and its hover card. JS marks it [data-landed] once
    the icon has fully faded in, which is the only state that accepts a hover. */
 .app-slot {
-  width: clamp(3rem, 7vw, 6.5rem);
+  /* Named so the crown can size itself off the icon: it is set in font-size, and
+     a percentage there would resolve against the inherited type size, not the
+     icon's width. */
+  --icon: clamp(3rem, 7vw, 6.5rem);
+  width: var(--icon);
   pointer-events: none;
 }
 
 .app-slot[data-landed] {
   pointer-events: auto;
-  cursor: help;
+  cursor: pointer;
 }
 
 .app-slot:focus {
@@ -133,6 +137,44 @@ body {
   transform: translate3d(0, calc((1 - var(--p)) * 1.25rem), 0)
     rotate(var(--tilt, 0deg)) scale(calc(0.86 + 0.14 * var(--p)));
   will-change: opacity, transform;
+}
+
+/* --- Crown --------------------------------------------------------------- */
+
+/* Sits on top of the icon, overlapping its top edge. Absolutely positioned
+   against .app-icon, which is already a containing block because it has a
+   transform — position: relative is here to say so out loud, not to add
+   anything. */
+.app-icon {
+  position: relative;
+}
+
+.app-crown {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  /* Just over half the icon, measured off --icon rather than inherited type. */
+  font-size: calc(var(--icon) * 0.56);
+  line-height: 1;
+  /* The emoji is the art, so name the colour fonts outright — the page's own
+     face has no crown glyph, and an unlucky fallback is a tofu box. */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  /* Overlaps the artwork so the band rests on the icon's top edge rather than
+     floating above it. Shallow on purpose: it sits in front now, so every extra
+     percent covers artwork instead of hiding behind it. Part of this is spent on
+     the em box's bottom bearing, which puts the glyph higher than the box. */
+  transform: translate(-50%, 18%);
+  transform-origin: bottom center;
+  /* No z-index needed to sit on top of the icon: a positioned element paints
+     above a static sibling whatever the DOM order, and the artwork is static. */
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Rides the same lift as the artwork — otherwise the icon slides out from under
+   the crown on hover. */
+.app-slot[data-landed]:hover .app-crown,
+.app-slot[data-landed]:focus-visible .app-crown {
+  transform: translate(-50%, 18%) translateY(-0.3rem) scale(1.07);
 }
 
 /* Store artwork ships square — the rounding is the platform's job, so it is
@@ -153,82 +195,170 @@ body {
   box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.9);
 }
 
-/* --- Hover card ---------------------------------------------------------- */
+/* --- Hover card: 32-bit dialog box --------------------------------------- */
 
+/* Everything here is a whole multiple of --px, the card's notion of one pixel.
+   Break the grid and the frame stops looking drawn and starts looking scaled.
+   Deliberately absent: border-radius, backdrop blur, blurred shadows, easing
+   curves, sub-pixel type sizes — each one is the opposite of a bitmap look. */
 .app-card {
+  /* One knob for the whole card: frame weight, bevel, padding, gap, gutter and
+     shadow offset are all multiples of it. Raise it to scale the chrome, and
+     raise the type sizes below by the same step to keep the two in proportion. */
+  --px: 5px;
+  --card-frame: #efedff;
+  --card-ink: #fff6c2;
+
   position: absolute;
-  top: calc(100% + 0.7rem);
+  /* Above the wordmark (10) and the grown portrait (20), which would otherwise
+     paint over the card and make a solid panel look see-through. This only
+     works because no ancestor between here and the sticky section takes a
+     z-index — see the layer comment in hero.tsx. */
+  z-index: 30;
+  top: calc(100% + 3 * var(--px));
   width: max-content;
-  max-width: 12.5rem;
-  padding: 0.5rem 0.7rem 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 0.75rem;
-  background: rgba(11, 11, 15, 0.86);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
-  box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.95);
+  max-width: 22rem;
+  padding: calc(3 * var(--px)) calc(4 * var(--px));
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  /* Bitmap glyphs are already the right shape — smoothing only rounds off the
+     corners the face was drawn with. */
+  -webkit-font-smoothing: none;
+  /* Traces the notched silhouette below rather than a box, because it reads the
+     rendered alpha. Zero blur: a retro shadow is an offset copy, not a haze. */
+  filter: drop-shadow(var(--px) var(--px) 0 rgba(0, 0, 0, 0.85));
   opacity: 0;
-  /* Same angle as the icon, so the pair reads as one tilted object. */
-  transform: rotate(var(--tilt, 0deg)) translateY(-0.35rem);
+  transform: translateY(calc(-2 * var(--px)));
+  /* Stepped, not eased — motion lands on frames, like a sprite. */
   transition:
-    opacity 190ms ease,
-    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 120ms steps(3),
+    transform 140ms steps(3);
   /* The card must never intercept the hover that is keeping it open. */
   pointer-events: none;
 }
 
-/* Hangs off the side the icon leans towards, hinged at the corner nearest it, so
-   the rotation swings the far end away rather than sliding the whole card. */
+/* Two stacked notched plates make the frame: ::before is the full-size light
+   plate, ::after is the dark fill inset by one pixel on each side, leaving the
+   frame showing as an even one-pixel ring with stepped corners. A border can't
+   do this — clip-path would cut its corners away and leave the ring open. */
+.app-card::before,
+.app-card::after {
+  content: "";
+  position: absolute;
+  /* Each corner loses one pixel, which is what makes it read as drawn. */
+  clip-path: polygon(
+    var(--px) 0,
+    calc(100% - var(--px)) 0,
+    calc(100% - var(--px)) var(--px),
+    100% var(--px),
+    100% calc(100% - var(--px)),
+    calc(100% - var(--px)) calc(100% - var(--px)),
+    calc(100% - var(--px)) 100%,
+    var(--px) 100%,
+    var(--px) calc(100% - var(--px)),
+    0 calc(100% - var(--px)),
+    0 var(--px),
+    var(--px) var(--px)
+  );
+  /* Behind the text, which stays in flow. Safe because the drop-shadow filter
+     on .app-card makes it a stacking context, so a negative level here can only
+     go behind the card's own text, never behind the page. */
+  z-index: -1;
+}
+
+.app-card::before {
+  inset: 0;
+  background: var(--card-frame);
+}
+
+.app-card::after {
+  inset: var(--px);
+  /* Fully opaque, and the flat colour underneath guarantees it: the card sits
+     over the portrait now, so any alpha here would show a face through the
+     panel. Only the bitten-out corners are ever see-through. */
+  background-color: #16162f;
+  background-image:
+    /* CRT scanlines, one pixel on and two off. */
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(155deg, #26264f, #0e0e22);
+  /* Lit from the top left: the bevel that dates the whole thing to 1994. */
+  box-shadow:
+    inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.16),
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.45);
+}
+
+/* Hangs off the side the icon leans towards, so it never runs off the screen
+   edge. The icon keeps its tilt; the card does not follow it any more — a
+   rotated bitmap frame is a resampled bitmap frame, and the stepped corners and
+   one-pixel ring are exactly what the resampling smears. */
 .app-slot[data-lean="left"] .app-card {
   left: 0;
-  transform-origin: top left;
 }
 
 .app-slot[data-lean="right"] .app-card {
   right: 0;
-  transform-origin: top right;
 }
 
 .app-slot[data-landed]:hover .app-card,
 .app-slot[data-landed]:focus-visible .app-card {
   opacity: 1;
-  transform: rotate(var(--tilt, 0deg));
+  transform: none;
 }
 
 .app-card-head {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: calc(3 * var(--px));
   white-space: nowrap;
 }
 
+/* Silkscreen is drawn on an 8px grid, so whole multiples of 8 land dead on its
+   own pixels — 16px for the name is the sharpest size the face has to offer. */
 .app-card-name {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.95);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--card-ink);
+  /* Hard shadow under the type, the way a tile-based UI would ship it — the
+     same trick as the frame's, at glyph scale. */
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
 .app-card-year {
   margin-left: auto;
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 0.6rem;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  line-height: 20px;
+  color: #6de5f5;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
 .app-card-desc {
-  margin-top: 0.15rem;
-  font-size: 0.7rem;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.6);
+  margin-top: calc(2 * var(--px));
+  /* Pixel faces have their own built-in spacing, so the leading is set in whole
+     pixels rather than a ratio that would land the baseline off-grid. */
+  font-size: 12px;
+  line-height: 19px;
+  color: #b9b6e6;
+  /* The description is the one line that wraps, and a bitmap face needs a
+     shorter measure than a proportional one to stay readable. */
+  max-width: 24ch;
+  white-space: normal;
 }
 
 /* --- Portrait ------------------------------------------------------------ */
 
-/* A third of the grown width, so the scroll triples it. */
+/* Laid out at the grown width and held down to a third by .portrait-grow, not
+   laid out small and scaled up. A composited layer is rasterised once at its
+   untransformed size, so a layer that scales up stretches that one bitmap —
+   visibly soft mid-scroll, and only sharp again if the browser re-rasters.
+   Scaling down instead means the bitmap always has more pixels than the screen
+   is asking for. The drop-shadow on .portrait-img makes this load-bearing: a
+   filter forces its own raster, so it would blur with the image. */
 .portrait-slot {
-  width: calc(var(--target) / 3);
+  width: var(--target);
 }
 
 /* No bottom fade is needed: the cut-out is cropped at the chest, and that crop
@@ -275,10 +405,12 @@ body {
 }
 
 /* Scroll-linked, and the only thing the scroll does: triple the portrait from
-   its resting third of --target up to --target. The origin is the bottom edge,
-   which is the screen's bottom edge, so it stays anchored there at every size. */
+   its resting third of --target up to --target. Written as thirds of the full
+   width so the scale tops out at 1 and never exceeds it — see .portrait-slot.
+   The origin is the bottom edge, which is the screen's bottom edge, so it stays
+   anchored there at every size. */
 .portrait-grow {
-  transform: scale(calc(1 + 2 * var(--sp)));
+  transform: scale(calc((1 + 2 * var(--sp)) / 3));
   transform-origin: bottom center;
   will-change: transform;
 }
@@ -374,5 +506,10 @@ body {
   /* Icons still arrive on scroll — that is the content — but only by fading. */
   .app-icon {
     transform: rotate(var(--tilt, 0deg));
+  }
+  /* The card still appears, without the step-in. */
+  .app-card {
+    transform: none;
+    transition: opacity 120ms linear;
   }
 }
