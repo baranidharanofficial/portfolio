@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #060608;
+  --foreground: #fafafa;
 }
 
 @theme inline {
@@ -12,15 +12,367 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  /* clip, not hidden: hidden would make body a scroll container and break the
+     sticky hero. */
+  overflow-x: clip;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* --- Atmosphere ---------------------------------------------------------- */
+
+/* Slow-drifting colour wash behind the name. */
+.atmosphere {
+  background:
+    radial-gradient(
+      ellipse 55% 50% at 50% -8%,
+      rgba(124, 122, 255, 0.4),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 48% 42% at 10% 92%,
+      rgba(56, 189, 248, 0.26),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 42% 38% at 90% 86%,
+      rgba(232, 74, 200, 0.22),
+      transparent 72%
+    );
+  animation: drift 22s ease-in-out infinite alternate;
+}
+
+/* Hairline grid, faded out toward the edges by a radial mask. */
+.grid-veil {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 76px 76px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 65% 55% at 50% 45%,
+    #000 25%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    ellipse 65% 55% at 50% 45%,
+    #000 25%,
+    transparent 78%
+  );
+}
+
+/* Vignette: darkens the corners so the wash reads as light, not tint. */
+.vignette {
+  background: radial-gradient(
+    ellipse 75% 65% at 50% 45%,
+    transparent 40%,
+    rgba(6, 6, 8, 0.75) 100%
+  );
+}
+
+/* Film grain: breaks up the flat gradients so they don't band. */
+.grain {
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- Type --------------------------------------------------------------- */
+
+/* Bright silver base with a white band sweeping across it. The floor stays
+   high so the name never dips to a dull grey mid-animation. */
+.wordmark {
+  background-image: linear-gradient(
+    105deg,
+    #e4e4ee 0%,
+    #e4e4ee 32%,
+    #ffffff 50%,
+    #e4e4ee 68%,
+    #e4e4ee 100%
+  );
+  background-size: 260% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 70px rgba(150, 148, 255, 0.28));
+  animation: sheen 9s ease-in-out infinite;
+}
+
+/* --- App icons ----------------------------------------------------------- */
+
+/* The slot holds the icon and its hover card. JS marks it [data-landed] once
+   the icon has fully faded in, which is the only state that accepts a hover. */
+.app-slot {
+  width: clamp(3rem, 7vw, 6.5rem);
+  pointer-events: none;
+}
+
+.app-slot[data-landed] {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.app-slot:focus {
+  outline: none;
+}
+
+/* Each icon fades in over its own 0.14 slice of the scroll, starting at its
+   --at, so the four arrive one after another rather than together. */
+.app-icon {
+  --p: clamp(0, calc((var(--sp) - var(--at, 0)) / 0.14), 1);
+  opacity: calc(var(--p) * 0.92);
+  transform: translate3d(0, calc((1 - var(--p)) * 1.25rem), 0)
+    rotate(var(--tilt, 0deg)) scale(calc(0.86 + 0.14 * var(--p)));
+  will-change: opacity, transform;
+}
+
+/* Store artwork ships square — the rounding is the platform's job, so it is
+   this page's job here. */
+.app-icon-art {
+  border-radius: 23%;
+  box-shadow: 0 18px 42px -14px rgba(0, 0, 0, 0.8);
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms ease;
+}
+
+/* Hover lifts the artwork, not the icon: the icon's transform belongs to the
+   scroll, and a transition on it would lag every scroll frame. */
+.app-slot[data-landed]:hover .app-icon-art,
+.app-slot[data-landed]:focus-visible .app-icon-art {
+  transform: translateY(-0.3rem) scale(1.07);
+  box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* --- Hover card ---------------------------------------------------------- */
+
+.app-card {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  width: max-content;
+  max-width: 12.5rem;
+  padding: 0.5rem 0.7rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 0.75rem;
+  background: rgba(11, 11, 15, 0.86);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.95);
+  opacity: 0;
+  /* Same angle as the icon, so the pair reads as one tilted object. */
+  transform: rotate(var(--tilt, 0deg)) translateY(-0.35rem);
+  transition:
+    opacity 190ms ease,
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* The card must never intercept the hover that is keeping it open. */
+  pointer-events: none;
+}
+
+/* Hangs off the side the icon leans towards, hinged at the corner nearest it, so
+   the rotation swings the far end away rather than sliding the whole card. */
+.app-slot[data-lean="left"] .app-card {
+  left: 0;
+  transform-origin: top left;
+}
+
+.app-slot[data-lean="right"] .app-card {
+  right: 0;
+  transform-origin: top right;
+}
+
+.app-slot[data-landed]:hover .app-card,
+.app-slot[data-landed]:focus-visible .app-card {
+  opacity: 1;
+  transform: rotate(var(--tilt, 0deg));
+}
+
+.app-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.app-card-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.app-card-year {
+  margin-left: auto;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.app-card-desc {
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* --- Portrait ------------------------------------------------------------ */
+
+/* A third of the grown width, so the scroll triples it. */
+.portrait-slot {
+  width: calc(var(--target) / 3);
+}
+
+/* No bottom fade is needed: the cut-out is cropped at the chest, and that crop
+   line sits on the bottom edge of the screen at every scroll position, so the
+   screen edge does the hiding. */
+.portrait-img {
+  filter: saturate(1.06) drop-shadow(0 22px 55px rgba(0, 0, 0, 0.55));
+}
+
+/* Warm halo that ties the orange portrait back into the cool wash. */
+.portrait-glow {
+  position: absolute;
+  inset: 8% -18% -6%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(255, 138, 61, 0.22),
+    rgba(124, 122, 255, 0.14) 55%,
+    transparent 76%
+  );
+  filter: blur(28px);
+}
+
+/* Hidden until the stage flips to revealed, then eases up out of the dark.
+   Scales from the bottom too, so the entrance never lifts it off the edge. */
+.portrait-in {
+  opacity: 0;
+  transform-origin: bottom center;
+}
+
+[data-revealed] .portrait-in {
+  animation: portrait-in 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Scroll ------------------------------------------------------------- */
+
+/* JS writes --sp (scroll progress 0..1) on .stage; everything else is derived. */
+.stage {
+  --sp: 0;
+  /* Width the portrait grows to: 50vw, floored on a tall viewport so it still
+     reaches up to the name, capped on a short one so the face cannot be pushed
+     off the top of the screen. */
+  --target: min(max(50vw, 55vh), 115vh);
+}
+
+/* Scroll-linked, and the only thing the scroll does: triple the portrait from
+   its resting third of --target up to --target. The origin is the bottom edge,
+   which is the screen's bottom edge, so it stays anchored there at every size. */
+.portrait-grow {
+  transform: scale(calc(1 + 2 * var(--sp)));
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
+/* --- Entrance ----------------------------------------------------------- */
+
+.rise {
+  animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Type block gives up a little height so name and portrait read as one unit,
+   then settles back as the portrait rides over it. */
+.type-lift {
+  opacity: calc(1 - 0.32 * var(--sp));
+  transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-revealed] .type-lift {
+  transform: translateY(clamp(-2.75rem, -5.5vh, -1.25rem));
+}
+
+@keyframes portrait-in {
+  from {
+    opacity: 0;
+    transform: translateY(2.5rem) scale(0.94);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes sheen {
+  0%,
+  100% {
+    background-position: 100% 0;
+  }
+  50% {
+    background-position: 0 0;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(0, -2.5%, 0) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atmosphere,
+  .wordmark,
+  .rise,
+  [data-revealed] .portrait-in {
+    animation: none;
+  }
+  .wordmark {
+    background-position: 50% 0;
+  }
+  .rise {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  /* Portrait still waits its 3s, but arrives as a plain fade. */
+  .portrait-in {
+    transition: opacity 600ms linear;
+  }
+  [data-revealed] .portrait-in {
+    opacity: 1;
+  }
+  .type-lift {
+    transform: none;
+    transition: none;
+  }
+  /* Icons still arrive on scroll — that is the content — but only by fading. */
+  .app-icon {
+    transform: rotate(var(--tilt, 0deg));
+  }
 }
