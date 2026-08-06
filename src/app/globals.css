@@ -568,6 +568,112 @@ body {
   animation: portrait-in 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* --- Contact pill -------------------------------------------------------- */
+
+/* The page's closing line. It arrives on a boolean and a transition rather than
+   on an --sp ramp like everything else here, and that is the point: the reel is
+   scrubbed, this has landed. JS owning the one boolean is also what lets the
+   links be untabbable and unclickable until it is really on screen.
+   Typeset in mono micro-caps, the same voice as the "Scroll to Know More" hint
+   at the top — the invitation the page opens with and the reply it closes on. */
+.contact-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 1.25rem;
+  /* Clear of the scroll rail (40) and the hover cards (30): once it arrives it
+     is the frontmost thing on the page, and the only one that takes a click. */
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  /* Never wider than the screen it floats on. */
+  max-width: calc(100% - 1.5rem);
+  padding: 0.375rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Opaque enough to lift mono caps off the portrait's shirt, which is what sits
+     behind the pill at the end of the scroll. */
+  background: rgba(10, 10, 18, 0.72);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow:
+    0 18px 40px -18px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  /* Parked below the bottom edge. The -50% arm is the centring, so the slide has
+     to be written as part of the same transform rather than beside it. */
+  transform: translate(-50%, calc(100% + 1.5rem));
+  transition:
+    opacity 380ms ease,
+    transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+[data-end] .contact-pill {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+/* Carries the divider so the link itself stays a clean pill-shaped hit area. */
+.contact-item {
+  display: flex;
+  align-items: center;
+}
+
+.contact-sep {
+  width: 1px;
+  height: 1.15rem;
+  flex: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.contact-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  /* Three peers, so none of them shouts; white is reserved for the one under
+     the pointer. */
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease;
+}
+
+.contact-link:hover,
+.contact-link:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.contact-link:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 1px;
+}
+
+.contact-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+/* Tightened rather than truncated: all three labels still read on a 320px
+   screen, which is narrower than anything that ships. */
+@media (max-width: 420px) {
+  .contact-link {
+    gap: 0.35rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+  }
+}
+
 /* --- Scroll rail --------------------------------------------------------- */
 
 /* Stands in for the scrollbar the page just hid. Lives inside .stage, so it
@@ -782,5 +888,11 @@ body {
   .mark-card {
     transform: none;
     transition: opacity 120ms linear;
+  }
+  /* The pill still arrives — it is the only way to reach him — but it fades in
+     where it belongs instead of sliding up to it. */
+  .contact-pill {
+    transform: translate(-50%, 0);
+    transition: opacity 240ms linear;
   }
 }

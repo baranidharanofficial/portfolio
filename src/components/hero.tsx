@@ -14,6 +14,14 @@ const FADE_IN = 0.09;
  *  .mark-icon. */
 const FADE_OUT = 0.05;
 
+/** Where the contact pill arrives, and where it leaves again. Two thresholds
+ *  rather than one: a single one sits on the knife edge of a rubber-band scroll
+ *  or a trackpad's last pixel and flickers the pill in and out. In at the tail
+ *  of the last phase, out a little earlier, so the gap has to be crossed
+ *  deliberately. */
+const CONTACT_IN = 0.96;
+const CONTACT_OUT = 0.93;
+
 /** Scroll a phase spends with its whole set on screen and nothing moving. This
  *  is the part worth reading, so it is reserved first and the staggered intro
  *  gets whatever the window has left — reserve it the other way round and the
@@ -279,6 +287,49 @@ function Crown() {
   );
 }
 
+/** Marks in the pill. Inline SVG rather than an icon package: three glyphs is
+ *  not worth a dependency, and inline they inherit currentColor and so follow
+ *  the link's hover on their own. viewBox 24 on all three, so they optically
+ *  match at one size. */
+const LINKS: { label: string; href: string; icon: React.ReactNode }[] = [
+  {
+    label: "Instagram",
+    href: "https://instagram.com/baranidharan_b_",
+    // Three pieces — the rounded frame, the lens, the flash. The two rings are
+    // drawn as outer-then-inner subpaths and filled evenodd, so the middle is
+    // punched out rather than depending on which way each arc happens to sweep.
+    icon: (
+      <>
+        <path
+          fillRule="evenodd"
+          d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4A5.8 5.8 0 0 1 16.2 22H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm0 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.8Z"
+        />
+        <path
+          fillRule="evenodd"
+          d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"
+        />
+        <circle cx="17.45" cy="6.55" r="1.35" />
+      </>
+    ),
+  },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/in/baranidharanb",
+    icon: (
+      <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9h4v12H3V9Zm6 0h3.8v1.71h.05a4.2 4.2 0 0 1 3.77-2.07c4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.44c0-1.3-.02-2.97-1.81-2.97-1.81 0-2.09 1.42-2.09 2.88V21H9V9Z" />
+    ),
+  },
+  {
+    label: "Email",
+    // mailto, not a form: there is no backend here, and a link hands the reader
+    // straight to the client they already have.
+    href: "mailto:baranidharan.balamurugan@travafa.com",
+    icon: (
+      <path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2L12 12.6 20.6 7H3.4ZM20 9.3l-8 5.2-8-5.2V17h16V9.3Z" />
+    ),
+  },
+];
+
 export function Hero() {
   const [revealed, setRevealed] = useState(false);
   // Bitmask over MARKS: bit i is set while mark i is hoverable. One number, so
@@ -287,9 +338,12 @@ export function Hero() {
   // Index of the mark whose card is opened for us, or -1. Only below lg:, where
   // there is no pointer to hover with — see .mark-slot[data-auto] in globals.css.
   const [auto, setAuto] = useState(-1);
+  // Whether the scroll has run out, which is the contact pill's cue.
+  const [ended, setEnded] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const liveRef = useRef(0);
   const autoRef = useRef(-1);
+  const endedRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setRevealed(true), PORTRAIT_DELAY_MS);
@@ -356,6 +410,17 @@ export function Hero() {
         autoRef.current = latest;
         setAuto(latest);
       }
+
+      // Hysteresis, so the pill cannot chatter on the last pixel of the scroll:
+      // it arrives at CONTACT_IN and only leaves once the reader has climbed
+      // back past CONTACT_OUT.
+      const end = endedRef.current
+        ? progress >= CONTACT_OUT
+        : progress >= CONTACT_IN;
+      if (end !== endedRef.current) {
+        endedRef.current = end;
+        setEnded(end);
+      }
     };
 
     const onScroll = () => {
@@ -376,6 +441,7 @@ export function Hero() {
     <div
       ref={stage}
       data-revealed={revealed ? "" : undefined}
+      data-end={ended ? "" : undefined}
       className="stage absolute inset-0"
     >
       {/* Background layer: behind the type and the portrait, above the wash.
@@ -568,6 +634,47 @@ export function Hero() {
           </div>
         </div>
       </div>
+
+      {/* The page's last word: three ways to reach him, floated in from the
+          bottom edge once the scroll runs out. The only interactive thing on the
+          page, so it is also the only thing that takes pointer events —
+          everything above is a reel you scroll, not a UI you click.
+          inert while hidden, which keeps the three links out of the tab order
+          and unclickable until the pill has actually arrived; the CSS below
+          handles the pointer on its own for anything that ignores the
+          attribute. */}
+      <nav
+        aria-label="Contact"
+        inert={!ended}
+        className="contact-pill"
+      >
+        {LINKS.map((link, i) => (
+          <div key={link.label} className="contact-item">
+            {/* Hairline between neighbours, not around each item: the divider
+                belongs to the gap, so the first one does without. */}
+            {i > 0 && <span aria-hidden className="contact-sep" />}
+            <a
+              className="contact-link"
+              href={link.href}
+              // mailto stays in place; the two profiles open away from the page.
+              {...(link.href.startsWith("http") && {
+                target: "_blank",
+                rel: "noreferrer noopener",
+              })}
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="contact-icon"
+              >
+                {link.icon}
+              </svg>
+              {link.label}
+            </a>
+          </div>
+        ))}
+      </nav>
     </div>
   );
 }

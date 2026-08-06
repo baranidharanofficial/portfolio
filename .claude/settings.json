@@ -126,7 +126,13 @@
       "Bash(python3 -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --remote-debugging-port=9222 --user-data-dir=./cdp-profile about:blank)",
       "Bash(node shot.mjs http://localhost:3000 390 844 0.15 4200 mob-015.png)",
-      "Bash(node shot.mjs http://localhost:3000 768 1024 0.55 4200 tab-055.png)"
+      "Bash(node shot.mjs http://localhost:3000 768 1024 0.55 4200 tab-055.png)",
+      "Bash(node pill.mjs 390 844 1 pill-m1.png)",
+      "Bash(node pill.mjs 390 844 0.9 pill-m09.png)",
+      "Bash(node pill.mjs 320 640 1 pill-320.png)",
+      "Bash(node pill.mjs 1440 900 1 pill-d1.png)",
+      "Bash(echo \"lint-exit=$?\")",
+      "Bash(sed -i '' 's/return JSON.stringify\\({ x: b.left, y: b.top,/return JSON.stringify\\({ x: b.left + window.scrollX, y: b.top + window.scrollY,/' crop.mjs)"
     ]
   }
 }
