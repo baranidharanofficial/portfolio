@@ -25,50 +25,70 @@ const HOLD = 0.08;
  *  centre, which the name and the growing portrait own.
  *  `tilt` is degrees, and its sign picks the side the hover card hangs off:
  *  negative dips the mark's left side, so the card hangs left. Keep each tilt's
- *  sign matching the side of the screen its slot sits on, or the card will hang
- *  off the edge. The card itself is never rotated — it is a bitmap frame.
- *  On a phone every slot sits in the band above the name, because the grown
- *  portrait spans the full width down there.
+ *  sign matching the side of the screen its slot sits on — that is also the side
+ *  with the most room for the card, so a centre slot's card still has somewhere
+ *  to go. The card itself is never rotated — it is a bitmap frame.
+ *  From lg: up, slots sit either side of the portrait.
+ *  Below lg: the portrait fills the width, so they all live in the band above
+ *  the name — and they trace an arc across it rather than stacking into two
+ *  columns. The arc is what fits the space: the head owns the middle and rises
+ *  highest, so the slots nearest the centre sit highest and each pair steps down
+ *  as it moves out, following the dome of empty sky over the portrait.
+ *  Ordered by how many marks a phase has rather than along the curve: the crown
+ *  pair first so a two-mark phase gets a balanced pair high in the band, then
+ *  the two ends so a four-mark phase spans the whole arc, and only then the
+ *  pair between them, which just fills the curve in at five and six. Taking them
+ *  in order along the curve instead would leave a four-mark phase — which is two
+ *  of the three phases here — crowded into one half of it.
  *  A phase with more marks than there are slots wraps and overlaps two of them —
- *  ugly on sight, which is the point. Add a slot rather than let one hide. */
-/** `hug` hands a slot's horizontal placement to CSS at sm: and up, pinning it
+ *  ugly on sight, which is the point. Add a slot rather than let one hide.
+ *
+ *  `hug` hands a slot's horizontal placement to CSS at lg: and up, pinning it
  *  just outside the portrait's edge — see .mark-slot[data-hug] in globals.css.
  *  The slots beside the portrait need it: a fixed percentage that clears the
  *  portrait on a wide screen sits inside it on a narrow one, and the shoulders
  *  swallowed two marks whole at tablet width. `gap` widens the offset so hugging
- *  slots on the same side don't stack into a column. */
+ *  slots on the same side don't stack into a column. Both are lg:-only, so they
+ *  have no bearing on the arc. */
 const SLOTS: {
   place: string;
   tilt: number;
   hug?: "left" | "right";
   gap?: string;
 }[] = [
+  // Crown of the arc: nearest the centre, so highest — over the head below and
+  // clear of the phase rail above. First, so a two-mark phase takes this pair.
   {
-    place: "left-[7%] top-[13%] sm:left-[9%] sm:top-[16%]",
+    place: "left-[20%] top-[10%] lg:left-[9%] lg:top-[16%]",
     tilt: -8,
   },
   {
-    place: "right-[8%] top-[11%] sm:right-[10%] sm:top-[25%]",
+    place: "right-[20%] top-[10%] lg:right-[10%] lg:top-[25%]",
     tilt: 6,
   },
+  // Ends of the arc: hard against the edges and lowest, where the portrait has
+  // narrowed to nothing and there is the most room to drop. Taken third and
+  // fourth so a four-mark phase spans the whole curve rather than crowding one
+  // end of it.
   {
-    place: "left-[17%] top-[27%] sm:top-auto sm:bottom-[25%]",
+    place: "left-[3%] top-[29%] lg:top-auto lg:bottom-[25%]",
     tilt: -5,
     hug: "left",
   },
   {
-    place: "right-[16%] top-[30%] sm:top-auto sm:bottom-[14%]",
+    place: "right-[3%] top-[29%] lg:top-auto lg:bottom-[14%]",
     tilt: 9,
     hug: "right",
   },
+  // Between the two, filling the arc in when a phase runs to five or six.
   {
-    place: "left-[6%] top-[2%] sm:top-[46%]",
+    place: "left-[11%] top-[19%] lg:top-[46%]",
     tilt: -6,
     hug: "left",
     gap: "2.75rem",
   },
   {
-    place: "right-[7%] top-[2%] sm:top-[44%]",
+    place: "right-[11%] top-[19%] lg:top-[44%]",
     tilt: 7,
     hug: "right",
     gap: "2.75rem",
@@ -138,8 +158,7 @@ const PHASES: { key: string; label: string; from: number; to: number; marks: Mar
   {
     key: "companies",
     // Oldest first, so the set builds up to the current role rather than
-    // counting back from it. Job titles are the one field still missing — the
-    // LinkedIn profile masks every one of them.
+    // counting back from it — the titles climb with it.
     // Casing is LinkedIn's own: ZenDynamix, not Zendynamix.
     label: "Where I've Worked",
     from: 0.34,
@@ -148,21 +167,21 @@ const PHASES: { key: string; label: string; from: number; to: number; marks: Mar
       {
         slug: "cognizant",
         name: "Cognizant",
-        desc: "Role — fill in",
+        desc: "Programmer Analyst",
         meta: "Feb 2021 — Mar 2022",
         logo: "/cognizant.jpg",
       },
       {
         slug: "zendynamix",
         name: "ZenDynamix",
-        desc: "Role — fill in",
+        desc: "React & Flutter Developer",
         meta: "Mar 2022 — Mar 2023",
         logo: "/zendynamix.jpg",
       },
       {
         slug: "buildsuite-co",
         name: "BuildSuite",
-        desc: "Role — fill in",
+        desc: "Flutter Developer",
         meta: "Jun 2023 — Dec 2024",
         // The app icon, not the 200px company logo off LinkedIn: same mark at
         // five times the resolution, and the coloured ground sits better on a
@@ -173,7 +192,9 @@ const PHASES: { key: string; label: string; from: number; to: number; marks: Mar
       {
         slug: "travafa-co",
         name: "Travafa",
-        desc: "Role — fill in",
+        // U+2011 non-breaking hyphen, so the measure below breaks the line
+        // after "and" rather than mid-word at "co-".
+        desc: "Front-end lead and co‑founder",
         meta: "Jan 2024 — Now",
         // Same reasoning as BuildSuite above.
         logo: "/travafa.png",
@@ -183,9 +204,9 @@ const PHASES: { key: string; label: string; from: number; to: number; marks: Mar
   {
     key: "education",
     // Names and dates are from the LinkedIn profile's structured data, which
-    // leaves both schools unmasked. The degrees are masked, so those two lines
-    // are still yours to fill. Crests are the profile's own 100px logos — small
-    // for the tile, so swap in larger art if you have it.
+    // leaves both schools unmasked; the degrees were masked there and came from
+    // you. Crests are the profile's own 100px logos — small for the tile, so
+    // swap in larger art if you have it.
     label: "Where I Studied",
     from: 0.67,
     to: 1.0,
@@ -193,7 +214,7 @@ const PHASES: { key: string; label: string; from: number; to: number; marks: Mar
       {
         slug: "christ-college",
         name: "Christ College of Engineering and Technology",
-        desc: "Degree — fill in",
+        desc: "B.Tech Electronics and Communication",
         meta: "2016 — 2020",
         logo: "/christ-college.jpg",
       },
@@ -378,7 +399,12 @@ export function Hero() {
                     alt=""
                     width={1024}
                     height={1024}
-                    sizes="(min-width: 640px) 7vw, 13vw"
+                    // Tracks --icon in globals.css: capped at 6.5rem from
+                    // ~1095px up, on the 9.5vw slope between there and 640px,
+                    // and pinned to the 4rem floor below that. Rounded up at
+                    // each step — over-estimating costs a slightly larger file,
+                    // under-estimating costs a soft one.
+                    sizes="(min-width: 1095px) 104px, (min-width: 640px) 10vw, 68px"
                     className="mark-art block h-full w-full"
                   />
                 ) : (
@@ -411,8 +437,12 @@ export function Hero() {
           a card opening near the top still wins the overlap.
           Every label shares one grid cell, so the cell is as wide as the longest
           of them and the rules either side hold still as the words cross-fade. */}
-      <div className="phase-rail pointer-events-none absolute inset-x-0 top-[7%] z-[25] flex items-center justify-center px-5">
-        <p className="eyebrow font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/60 sm:text-xs">
+      {/* Higher below lg:, where the marks arc across the band beneath it and
+          the crown of that arc needs the room. */}
+      <div className="phase-rail pointer-events-none absolute inset-x-0 top-[4%] z-[25] flex items-center justify-center px-5 lg:top-[7%]">
+        {/* Typography lives in .eyebrow, not here: a pixel face only stays
+            crisp at whole-pixel sizes, and Tailwind's type scale is in rem. */}
+        <p className="eyebrow">
           {PHASES.map((phase, p) => (
             <span
               key={phase.key}
@@ -429,7 +459,7 @@ export function Hero() {
                   parked on the rail: on the beat between two phases every label
                   is at zero, and shared rules would sit there framing nothing. */}
               <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
-              {phase.label}
+              <span className="eyebrow-word">{phase.label}</span>
               <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
             </span>
           ))}
@@ -495,7 +525,13 @@ export function Hero() {
               width={1254}
               height={1254}
               loading="eager"
-              sizes="min(115vh, max(50vw, 55vh))"
+              // Tracks --target in globals.css, which changes shape at lg:.
+              // Below that the portrait fills the width; above it, it steps back
+              // to 50vw to leave lanes for the marks. The lg: arm omits --target's
+              // third cap, so it over-estimates on the narrow viewports where
+              // that cap bites — the safe direction: a larger file, never a soft
+              // one.
+              sizes="(min-width: 1024px) min(115vh, max(50vw, 55vh)), min(115vh, max(100vw, 55vh))"
               quality={90}
               className="portrait-img h-auto w-full"
             />

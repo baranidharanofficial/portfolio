@@ -3,6 +3,10 @@
 :root {
   --background: #060608;
   --foreground: #fafafa;
+  /* Ink of the bitmap HUD — the phase label at the top of the stage and the
+     type inside every hover card. One token because they are one system; change
+     it here and both follow. */
+  --card-ink: #fff6c2;
 }
 
 @theme inline {
@@ -117,12 +121,48 @@ body {
 }
 
 /* One grid cell for every phase label, so the cell measures the longest of them
-   and nothing shifts as the words hand over. */
+   and nothing shifts as the words hand over.
+   Set in the same bitmap face as the hover cards: the label names a set and the
+   cards describe its members, so the two should read as one HUD rather than as
+   two typographic systems that happen to share a page. */
 .eyebrow {
   display: grid;
   align-items: center;
   justify-items: center;
   white-space: nowrap;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  /* Bitmap glyphs are already the right shape — smoothing only rounds off the
+     corners the face was drawn with. */
+  -webkit-font-smoothing: none;
+  /* Silkscreen is drawn on an 8px grid, so size, leading and tracking are all
+     whole pixels: a rem or an em would land the glyphs off-grid and fur their
+     edges, which is the one thing a pixel face cannot survive. */
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--card-ink);
+  /* Hard shadow, no blur — the same trick the card frame and its type use. */
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* letter-spacing adds its space after the last glyph too, which would leave the
+   right-hand rule sitting one tracking-step further out than the left. Pulling
+   it back keeps the pair symmetric about the word. */
+.eyebrow-word {
+  margin-right: -2px;
+}
+
+@media (min-width: 640px) {
+  .eyebrow {
+    font-size: 16px;
+    line-height: 20px;
+    letter-spacing: 3px;
+  }
+
+  .eyebrow-word {
+    margin-right: -3px;
+  }
 }
 
 .eyebrow > * {
@@ -164,12 +204,12 @@ body {
    than at a fixed percentage of the screen. The portrait's width is --target,
    which tracks the viewport on its own curve, so a percentage that clears it at
    one size sits inside it at another — at tablet widths the shoulders swallowed
-   the two bottom marks whole. Only from sm: up, because below that every slot
-   sits in the band above the name and the portrait spans the full width anyway.
+   the two bottom marks whole. Only from lg: up, because below that every slot
+   sits in the band above the name and the portrait fills the width anyway.
    max() keeps a mark on screen in the degenerate case where the portrait is
    wide enough to leave no gutter at all; there it rides the transparent corner
    of the cut-out rather than being pushed off the edge. */
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .mark-slot[data-hug="left"] {
     left: max(
       0.75rem,
@@ -311,7 +351,6 @@ body {
      raise the type sizes below by the same step to keep the two in proportion. */
   --px: 5px;
   --card-frame: #efedff;
-  --card-ink: #fff6c2;
 
   position: absolute;
   /* Above the wordmark (10) and the grown portrait (20), which would otherwise
@@ -321,7 +360,13 @@ body {
   z-index: 30;
   top: calc(100% + 3 * var(--px));
   width: max-content;
-  max-width: 22rem;
+  /* The vw arm only binds on a phone, and it is what keeps the card on screen
+     there. A card is anchored to its mark's near edge and grows away from it, so
+     the widest it can ever be without running off is (100vw - the mark's inset).
+     The arc's crown pair sits at a 20% inset — furthest in of any slot — so 70vw
+     clears it with room to spare, and every slot outboard of that by more. Above
+     phone widths 22rem is the smaller of the two and nothing changes. */
+  max-width: min(22rem, 70vw);
   padding: calc(3 * var(--px)) calc(4 * var(--px));
   font-family: var(--font-pixel), ui-monospace, monospace;
   /* Bitmap glyphs are already the right shape — smoothing only rounds off the
@@ -511,11 +556,25 @@ body {
      monogram that measures itself off the icon. Set in length, not a
      percentage: the crown reads it as a font-size, where a percentage would
      resolve against the inherited type size instead of the icon's width. */
-  --icon: clamp(3rem, 7vw, 6.5rem);
-  /* Width the portrait grows to: 50vw, floored on a tall viewport so it still
-     reaches up to the name, capped on a short one so the face cannot be pushed
-     off the top of the screen. */
-  --target: min(max(50vw, 55vh), 115vh);
+  /* The slope is what sizes a phone and a tablet: 7vw sat under the old 3rem
+     floor on anything narrower than ~686px, so every phone got the smallest
+     mark on offer while a desktop got the largest. A steeper slope off a higher
+     floor grows the small and middle widths and leaves the wide ones alone —
+     from ~1095px up this still tops out at the same 6.5rem it always did. */
+  --icon: clamp(4rem, 9.5vw, 6.5rem);
+  /* Width the portrait grows to. Below lg: it fills the width and then some —
+     every mark sits in the band above the name down here, so there is nothing
+     beside the portrait for it to cover, and a tablet was otherwise left with a
+     73%-wide portrait under a lot of empty sky. 100%, not 100vw: vw counts the
+     scrollbar and would bleed the portrait past both edges.
+     The 62vh floor is what fills a phone, where 100% is the smaller of the two
+     and would leave the portrait sitting in the bottom half under a band of
+     empty sky. It bleeds the width off both edges, which is the intent — a
+     cropped portrait, not a small figure floating in the dark. Raising it much
+     past here starts swallowing the wordmark whole rather than riding over it:
+     68vh left only the last two letters showing on a phone.
+     Still capped at 115vh so a short screen cannot push the face off the top. */
+  --target: min(max(100%, 62vh), 115vh);
   /* How far the portrait has grown, 0..1. It finishes with the first phase
      rather than with the scroll: the growth belongs to the projects reveal, and
      the two phases after it are read against a portrait already at full size.
@@ -529,13 +588,13 @@ body {
   --gutter: max(0px, calc((100% - var(--target)) / 2));
 }
 
-/* On a viewport taller than roughly 1.8x its width, the 55vh floor above makes
-   the portrait span edge to edge and --gutter collapses to zero, leaving the
-   hugging marks nowhere to stand. A third cap keeps a lane wide enough for one
-   mark plus its margin on each side, so the gutter can never close.
-   Only from sm: up: below that every mark sits in the band above the name, and
-   applying this would shrink the portrait that deliberately fills a phone. */
-@media (min-width: 640px) {
+/* From lg: up the marks leave the band above the name and take up positions
+   either side of the portrait, so the portrait has to make room for them: back
+   to a 50vw base, plus a third cap reserving a lane one mark wide and its margin
+   on each side. Without that cap a viewport taller than roughly 1.8x its width
+   lets the 55vh floor span the portrait edge to edge, closing --gutter to zero
+   and leaving the hugging marks nowhere to stand. */
+@media (min-width: 1024px) {
   .stage {
     --target: min(
       max(50vw, 55vh),
@@ -566,6 +625,12 @@ body {
    the recession answers the portrait's growth, so it has to finish when the
    growth does rather than keep dimming through the last two phases. */
 .type-lift {
+  /* Nothing in this block is interactive — a display wordmark and a scroll
+     hint — and its box is far wider than the glyphs that are visible in it. Left
+     hit-testable it silently eats the hover on any mark that reaches it, which
+     is what happened to the top marks once they grew: the card simply never
+     opened, with nothing on screen to explain why. */
+  pointer-events: none;
   opacity: calc(1 - 0.32 * var(--pg));
   transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
