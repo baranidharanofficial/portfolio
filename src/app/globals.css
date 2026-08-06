@@ -18,6 +18,15 @@
 
 html {
   color-scheme: dark;
+  /* The page keeps its scroll, loses its scrollbar: .scroll-rail reports the
+     same thing in the page's own language. Firefox and the standard property
+     take this; WebKit needs the pseudo-element below. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 body {
@@ -457,6 +466,19 @@ body {
   transform: none;
 }
 
+/* Below lg: there is nothing to hover with, so the card opens itself: the scroll
+   is the pointer. JS sets [data-auto] on the newest mark to have fully arrived
+   and moves it to the next one as that arrives, so exactly one card is ever open
+   and the set reads itself out as you scroll past it. Above lg: this is off —
+   there the reader has a pointer, and three or four cards' worth of panels
+   opening unbidden either side of the portrait is noise, not information. */
+@media (max-width: 1023px) {
+  .mark-slot[data-auto] .mark-card {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .mark-card-head {
   display: flex;
   align-items: baseline;
@@ -544,6 +566,47 @@ body {
 
 [data-revealed] .portrait-in {
   animation: portrait-in 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Scroll rail --------------------------------------------------------- */
+
+/* Stands in for the scrollbar the page just hid. Lives inside .stage, so it
+   inherits --sp and needs no JS of its own; the stage is pinned for the whole
+   scroll, so an absolutely-positioned rail in it reads as fixed to the edge.
+   Hard against the right edge on purpose: the outermost mark slot sits at a 3%
+   inset, and anything further in than this would sit under it. */
+.scroll-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 40;
+  /* Capped by the room the edge actually has: the outermost mark slot sits at a
+     3% inset, which is only ~11px on a phone, so a rail much wider than this
+     starts sitting under a logo. */
+  width: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .scroll-rail {
+    width: 8px;
+  }
+}
+
+/* scaleY off the top edge rather than an animated height: a transform composites
+   and a height reflows, and this updates on every scroll frame. */
+.scroll-rail-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: top center;
+  transform: scaleY(var(--sp));
+  background: #ffffff;
+  /* Enough glow to read as light against the dark page without becoming a
+     second gradient in a page that already has several. */
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
+  will-change: transform;
 }
 
 /* --- Scroll ------------------------------------------------------------- */

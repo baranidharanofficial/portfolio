@@ -284,8 +284,12 @@ export function Hero() {
   // Bitmask over MARKS: bit i is set while mark i is hoverable. One number, so
   // a scroll frame that changes nothing re-renders nothing.
   const [live, setLive] = useState(0);
+  // Index of the mark whose card is opened for us, or -1. Only below lg:, where
+  // there is no pointer to hover with — see .mark-slot[data-auto] in globals.css.
+  const [auto, setAuto] = useState(-1);
   const stage = useRef<HTMLDivElement>(null);
   const liveRef = useRef(0);
+  const autoRef = useRef(-1);
 
   useEffect(() => {
     const timer = setTimeout(() => setRevealed(true), PORTRAIT_DELAY_MS);
@@ -328,13 +332,29 @@ export function Hero() {
       // Only a mark that has fully arrived and has not begun leaving accepts a
       // hover, so a card can never be summoned by a mark nobody can see.
       let mask = 0;
+      // The newest mark to have fully arrived — the one whose card opens itself
+      // on a touch screen. MARKS is ordered by reveal, so the highest live index
+      // is the latest arrival, and each new one takes the open card from the one
+      // before it.
+      let latest = -1;
       for (let i = 0; i < MARKS.length; i++) {
         const mark = MARKS[i];
-        if (progress >= mark.at + FADE_IN && progress < mark.end) mask |= 1 << i;
+        if (progress >= mark.at + FADE_IN && progress < mark.end) {
+          mask |= 1 << i;
+          // Closed again once its set starts to leave. The card is the icon's
+          // sibling, not its child, so it does not inherit the exit fade — left
+          // open it would hang there as a solid panel over an empty stage for
+          // the whole handover to the next phase.
+          if (progress < mark.end - FADE_OUT) latest = i;
+        }
       }
       if (mask !== liveRef.current) {
         liveRef.current = mask;
         setLive(mask);
+      }
+      if (latest !== autoRef.current) {
+        autoRef.current = latest;
+        setAuto(latest);
       }
     };
 
@@ -372,6 +392,7 @@ export function Hero() {
             <div
               key={mark.slug}
               data-live={on ? "" : undefined}
+              data-auto={i === auto ? "" : undefined}
               data-lean={mark.slot.tilt < 0 ? "left" : "right"}
               data-hug={mark.slot.hug}
               className={`mark-slot absolute ${mark.slot.place}`}
@@ -428,6 +449,15 @@ export function Hero() {
             </div>
           );
         })}
+      </div>
+
+      {/* The scrollbar's replacement: a white column that fills top to bottom
+          with --sp. Reads that variable off the stage it sits in, so it costs
+          nothing per frame beyond the transform. Above everything, cards
+          included (30) — it is chrome, not content, and it lives in the strip of
+          edge nothing else occupies. */}
+      <div aria-hidden className="scroll-rail">
+        <span className="scroll-rail-fill" />
       </div>
 
       {/* Names the set on stage. Pinned near the top edge rather than left in
