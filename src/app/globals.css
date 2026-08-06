@@ -107,49 +107,116 @@ body {
   animation: sheen 9s ease-in-out infinite;
 }
 
-/* --- App icons ----------------------------------------------------------- */
+/* --- Phase label --------------------------------------------------------- */
 
-/* The slot holds the icon and its hover card. JS marks it [data-landed] once
-   the icon has fully faded in, which is the only state that accepts a hover. */
-.app-slot {
-  /* Named so the crown can size itself off the icon: it is set in font-size, and
-     a percentage there would resolve against the inherited type size, not the
-     icon's width. */
-  --icon: clamp(3rem, 7vw, 6.5rem);
+/* The resting invitation under the name. Gone by the time the first phase label
+   arrives, so the two are never legible at once. Fades as a row — hairlines
+   included — because it frames nothing once the words are gone. */
+.scroll-hint {
+  opacity: clamp(0, calc(1 - var(--sp) / 0.03), 1);
+}
+
+/* One grid cell for every phase label, so the cell measures the longest of them
+   and nothing shifts as the words hand over. */
+.eyebrow {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  white-space: nowrap;
+}
+
+.eyebrow > * {
+  grid-area: 1 / 1;
+}
+
+/* Same in/out shape as a mark, offset by 0.03 to clear the hint. --to is set
+   past 1 on the last phase, which pins its label for the rest of the scroll. */
+.eyebrow-label {
+  --in: clamp(0, calc((var(--sp) - var(--from, 0) - 0.03) / 0.06), 1);
+  --out: clamp(0, calc((var(--to, 9) - var(--sp)) / 0.05), 1);
+  opacity: min(var(--in), var(--out));
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* --- Marks --------------------------------------------------------------- */
+
+/* A mark is one logo plus its hover card — an app, an employer, a school. The
+   slot holds both. JS marks it [data-live] for exactly the stretch where the
+   logo is fully arrived and not yet leaving, which is the only state that
+   accepts a hover. */
+.mark-slot {
   width: var(--icon);
   pointer-events: none;
 }
 
-.app-slot[data-landed] {
+.mark-slot[data-live] {
   pointer-events: auto;
   cursor: pointer;
 }
 
-.app-slot:focus {
+.mark-slot:focus {
   outline: none;
 }
 
-/* Each icon fades in over its own 0.14 slice of the scroll, starting at its
-   --at, so the four arrive one after another rather than together. */
-.app-icon {
-  --p: clamp(0, calc((var(--sp) - var(--at, 0)) / 0.14), 1);
-  opacity: calc(var(--p) * 0.92);
-  transform: translate3d(0, calc((1 - var(--p)) * 1.25rem), 0)
-    rotate(var(--tilt, 0deg)) scale(calc(0.86 + 0.14 * var(--p)));
+/* Slots that sit beside the portrait are placed against its actual edge rather
+   than at a fixed percentage of the screen. The portrait's width is --target,
+   which tracks the viewport on its own curve, so a percentage that clears it at
+   one size sits inside it at another — at tablet widths the shoulders swallowed
+   the two bottom marks whole. Only from sm: up, because below that every slot
+   sits in the band above the name and the portrait spans the full width anyway.
+   max() keeps a mark on screen in the degenerate case where the portrait is
+   wide enough to leave no gutter at all; there it rides the transparent corner
+   of the cut-out rather than being pushed off the edge. */
+@media (min-width: 640px) {
+  .mark-slot[data-hug="left"] {
+    left: max(
+      0.75rem,
+      calc(var(--gutter) - var(--icon) - var(--hug-gap, 0.75rem))
+    );
+    right: auto;
+  }
+
+  .mark-slot[data-hug="right"] {
+    right: max(
+      0.75rem,
+      calc(var(--gutter) - var(--icon) - var(--hug-gap, 0.75rem))
+    );
+    left: auto;
+  }
+}
+
+/* Two independent ramps: --in fades the mark up over its own 0.09 slice from
+   --at, staggered so a phase arrives one mark at a time; --out fades the whole
+   set down over the 0.05 before --end, so they leave together and the next
+   phase gets a clean stage. Opacity takes whichever ramp is lower. The exit
+   also drifts upward rather than back down, so leaving never looks like the
+   entrance played backwards. */
+.mark-icon {
+  --in: clamp(0, calc((var(--sp) - var(--at, 0)) / 0.09), 1);
+  --out: clamp(0, calc((var(--end, 9) - var(--sp)) / 0.05), 1);
+  opacity: calc(min(var(--in), var(--out)) * 0.92);
+  transform: translate3d(
+      0,
+      calc((1 - var(--in)) * 1.25rem - (1 - var(--out)) * 1.5rem),
+      0
+    )
+    rotate(var(--tilt, 0deg)) scale(calc(0.86 + 0.14 * var(--in)));
   will-change: opacity, transform;
 }
 
 /* --- Crown --------------------------------------------------------------- */
 
 /* Sits on top of the icon, overlapping its top edge. Absolutely positioned
-   against .app-icon, which is already a containing block because it has a
+   against .mark-icon, which is already a containing block because it has a
    transform — position: relative is here to say so out loud, not to add
    anything. */
-.app-icon {
+.mark-icon {
   position: relative;
 }
 
-.app-crown {
+.mark-crown {
   position: absolute;
   left: 50%;
   bottom: 100%;
@@ -172,14 +239,15 @@ body {
 
 /* Rides the same lift as the artwork — otherwise the icon slides out from under
    the crown on hover. */
-.app-slot[data-landed]:hover .app-crown,
-.app-slot[data-landed]:focus-visible .app-crown {
+.mark-slot[data-live]:hover .mark-crown,
+.mark-slot[data-live]:focus-visible .mark-crown {
   transform: translate(-50%, 18%) translateY(-0.3rem) scale(1.07);
 }
 
 /* Store artwork ships square — the rounding is the platform's job, so it is
-   this page's job here. */
-.app-icon-art {
+   this page's job here. Company and school logos get the same tile, so all
+   three phases read as one set of objects rather than three treatments. */
+.mark-art {
   border-radius: 23%;
   box-shadow: 0 18px 42px -14px rgba(0, 0, 0, 0.8);
   transition:
@@ -187,12 +255,48 @@ body {
     box-shadow 220ms ease;
 }
 
+/* Stands in until a logo file exists: initials on a tinted tile, cut to the
+   same silhouette as real artwork so a half-sourced phase still looks composed
+   rather than broken. */
+.mark-monogram {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  /* Not height: 100% — the slot is only as tall as its content, so a percentage
+     height here resolves to auto and the tile collapses to one line of type.
+     Real artwork holds the square open with its own intrinsic ratio; this has
+     to say so. */
+  aspect-ratio: 1;
+  background:
+    linear-gradient(150deg, var(--tint, #2a2a4d), rgba(10, 10, 22, 0.95));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 18px 42px -14px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-geist-sans), sans-serif;
+  /* Measured off --icon, not inherited type: the tile scales with the slot. */
+  font-size: calc(var(--icon) * 0.34);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.85);
+  user-select: none;
+}
+
 /* Hover lifts the artwork, not the icon: the icon's transform belongs to the
    scroll, and a transition on it would lag every scroll frame. */
-.app-slot[data-landed]:hover .app-icon-art,
-.app-slot[data-landed]:focus-visible .app-icon-art {
+.mark-slot[data-live]:hover .mark-art,
+.mark-slot[data-live]:focus-visible .mark-art {
   transform: translateY(-0.3rem) scale(1.07);
   box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* That hover replaces box-shadow wholesale, which would take the monogram's
+   ring with it. Same specificity, later in the file, so it wins. */
+.mark-slot[data-live]:hover .mark-monogram,
+.mark-slot[data-live]:focus-visible .mark-monogram {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 22px 50px -12px rgba(0, 0, 0, 0.9);
 }
 
 /* --- Hover card: 32-bit dialog box --------------------------------------- */
@@ -201,7 +305,7 @@ body {
    Break the grid and the frame stops looking drawn and starts looking scaled.
    Deliberately absent: border-radius, backdrop blur, blurred shadows, easing
    curves, sub-pixel type sizes — each one is the opposite of a bitmap look. */
-.app-card {
+.mark-card {
   /* One knob for the whole card: frame weight, bevel, padding, gap, gutter and
      shadow offset are all multiples of it. Raise it to scale the chrome, and
      raise the type sizes below by the same step to keep the two in proportion. */
@@ -240,8 +344,8 @@ body {
    plate, ::after is the dark fill inset by one pixel on each side, leaving the
    frame showing as an even one-pixel ring with stepped corners. A border can't
    do this — clip-path would cut its corners away and leave the ring open. */
-.app-card::before,
-.app-card::after {
+.mark-card::before,
+.mark-card::after {
   content: "";
   position: absolute;
   /* Each corner loses one pixel, which is what makes it read as drawn. */
@@ -260,17 +364,17 @@ body {
     var(--px) var(--px)
   );
   /* Behind the text, which stays in flow. Safe because the drop-shadow filter
-     on .app-card makes it a stacking context, so a negative level here can only
+     on .mark-card makes it a stacking context, so a negative level here can only
      go behind the card's own text, never behind the page. */
   z-index: -1;
 }
 
-.app-card::before {
+.mark-card::before {
   inset: 0;
   background: var(--card-frame);
 }
 
-.app-card::after {
+.mark-card::after {
   inset: var(--px);
   /* Fully opaque, and the flat colour underneath guarantees it: the card sits
      over the portrait now, so any alpha here would show a face through the
@@ -294,30 +398,34 @@ body {
    edge. The icon keeps its tilt; the card does not follow it any more — a
    rotated bitmap frame is a resampled bitmap frame, and the stepped corners and
    one-pixel ring are exactly what the resampling smears. */
-.app-slot[data-lean="left"] .app-card {
+.mark-slot[data-lean="left"] .mark-card {
   left: 0;
 }
 
-.app-slot[data-lean="right"] .app-card {
+.mark-slot[data-lean="right"] .mark-card {
   right: 0;
 }
 
-.app-slot[data-landed]:hover .app-card,
-.app-slot[data-landed]:focus-visible .app-card {
+.mark-slot[data-live]:hover .mark-card,
+.mark-slot[data-live]:focus-visible .mark-card {
   opacity: 1;
   transform: none;
 }
 
-.app-card-head {
+.mark-card-head {
   display: flex;
   align-items: baseline;
   gap: calc(3 * var(--px));
-  white-space: nowrap;
+  /* Wraps rather than running out of the frame. An app name fits on one line,
+     but an employer or an institution — "Christ College of Engineering and
+     Technology" — easily outruns the card's measure, and nowrap would push it
+     straight through the bevel. */
+  flex-wrap: wrap;
 }
 
 /* Silkscreen is drawn on an 8px grid, so whole multiples of 8 land dead on its
    own pixels — 16px for the name is the sharpest size the face has to offer. */
-.app-card-name {
+.mark-card-name {
   font-size: 16px;
   line-height: 20px;
   font-weight: 700;
@@ -327,7 +435,7 @@ body {
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
-.app-card-year {
+.mark-card-meta {
   margin-left: auto;
   font-size: 12px;
   line-height: 20px;
@@ -335,7 +443,7 @@ body {
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
-.app-card-desc {
+.mark-card-desc {
   margin-top: calc(2 * var(--px));
   /* Pixel faces have their own built-in spacing, so the leading is set in whole
      pixels rather than a ratio that would land the baseline off-grid. */
@@ -398,19 +506,51 @@ body {
 /* JS writes --sp (scroll progress 0..1) on .stage; everything else is derived. */
 .stage {
   --sp: 0;
+  /* A mark's width. Lives here rather than on .mark-slot because --target is
+     sized against it below, and it is inherited by every slot, crown and
+     monogram that measures itself off the icon. Set in length, not a
+     percentage: the crown reads it as a font-size, where a percentage would
+     resolve against the inherited type size instead of the icon's width. */
+  --icon: clamp(3rem, 7vw, 6.5rem);
   /* Width the portrait grows to: 50vw, floored on a tall viewport so it still
      reaches up to the name, capped on a short one so the face cannot be pushed
      off the top of the screen. */
   --target: min(max(50vw, 55vh), 115vh);
+  /* How far the portrait has grown, 0..1. It finishes with the first phase
+     rather than with the scroll: the growth belongs to the projects reveal, and
+     the two phases after it are read against a portrait already at full size.
+     --grown-by is that phase's end, set inline from PHASES[0].to so the ramp
+     and the phase table cannot drift apart. */
+  --pg: clamp(0, calc(var(--sp) / var(--grown-by, 1)), 1);
+  /* Clear space between one screen edge and the portrait's edge, once it has
+     grown. 100%, not 100vw: the page scrolls, so vw counts a scrollbar the
+     portrait is not centred within, and the marks would be placed that much
+     too far in. Resolved where it is used, against the mark layer's width. */
+  --gutter: max(0px, calc((100% - var(--target)) / 2));
 }
 
-/* Scroll-linked, and the only thing the scroll does: triple the portrait from
-   its resting third of --target up to --target. Written as thirds of the full
-   width so the scale tops out at 1 and never exceeds it — see .portrait-slot.
-   The origin is the bottom edge, which is the screen's bottom edge, so it stays
-   anchored there at every size. */
+/* On a viewport taller than roughly 1.8x its width, the 55vh floor above makes
+   the portrait span edge to edge and --gutter collapses to zero, leaving the
+   hugging marks nowhere to stand. A third cap keeps a lane wide enough for one
+   mark plus its margin on each side, so the gutter can never close.
+   Only from sm: up: below that every mark sits in the band above the name, and
+   applying this would shrink the portrait that deliberately fills a phone. */
+@media (min-width: 640px) {
+  .stage {
+    --target: min(
+      max(50vw, 55vh),
+      115vh,
+      calc(100% - 2 * (var(--icon) + 1.5rem))
+    );
+  }
+}
+
+/* Triples the portrait from its resting third of --target up to --target.
+   Written as thirds of the full width so the scale tops out at 1 and never
+   exceeds it — see .portrait-slot. The origin is the bottom edge, which is the
+   screen's bottom edge, so it stays anchored there at every size. */
 .portrait-grow {
-  transform: scale(calc((1 + 2 * var(--sp)) / 3));
+  transform: scale(calc((1 + 2 * var(--pg)) / 3));
   transform-origin: bottom center;
   will-change: transform;
 }
@@ -422,9 +562,11 @@ body {
 }
 
 /* Type block gives up a little height so name and portrait read as one unit,
-   then settles back as the portrait rides over it. */
+   then settles back as the portrait rides over it. Keyed to --pg, not --sp:
+   the recession answers the portrait's growth, so it has to finish when the
+   growth does rather than keep dimming through the last two phases. */
 .type-lift {
-  opacity: calc(1 - 0.32 * var(--sp));
+  opacity: calc(1 - 0.32 * var(--pg));
   transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -503,12 +645,13 @@ body {
     transform: none;
     transition: none;
   }
-  /* Icons still arrive on scroll — that is the content — but only by fading. */
-  .app-icon {
+  /* Marks still arrive and leave on scroll — that is the content — but only by
+     fading, with no lift, scale or exit drift. */
+  .mark-icon {
     transform: rotate(var(--tilt, 0deg));
   }
   /* The card still appears, without the step-in. */
-  .app-card {
+  .mark-card {
     transform: none;
     transition: opacity 120ms linear;
   }

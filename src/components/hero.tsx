@@ -6,79 +6,253 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 /** How long the name holds the stage alone before the portrait arrives. */
 const PORTRAIT_DELAY_MS = 3000;
 
-/** How long an icon takes to fade in, as a share of the scroll. Must match the
- *  0.14 divisor in .app-icon — it is also when the icon becomes hoverable. */
-const ICON_FADE = 0.14;
+/** How long a mark takes to fade in, as a share of the whole scroll. Must match
+ *  the 0.09 divisor in .mark-icon — it is also when the mark becomes hoverable. */
+const FADE_IN = 0.09;
 
-/** The shipped apps, scattered behind the type and revealed one at a time as
- *  the page scrolls. Ordered by `at`, the scroll progress each one starts
- *  arriving at — spaced by more than ICON_FADE so they never overlap, and the
- *  ordering is what lets a single count decide which have landed.
- *  On a phone all four sit in the empty band above the name, because the grown
- *  portrait spans the full width down there.
+/** How long the set takes to fade back out. Must match the 0.05 divisor in
+ *  .mark-icon. */
+const FADE_OUT = 0.05;
+
+/** Scroll a phase spends with its whole set on screen and nothing moving. This
+ *  is the part worth reading, so it is reserved first and the staggered intro
+ *  gets whatever the window has left — reserve it the other way round and the
+ *  last mark of a phase lands just in time to start fading out again. */
+const HOLD = 0.08;
+
+/** Where marks sit on the stage, in reveal order. Sides alternate so a phase
+ *  with only two marks still reads as balanced, and every slot clears the
+ *  centre, which the name and the growing portrait own.
  *  `tilt` is degrees, and its sign picks the side the hover card hangs off:
- *  negative dips the icon's left side, so the card hangs left. Keep each tilt's
- *  sign matching the side of the screen the icon sits on, or its card will hang
+ *  negative dips the mark's left side, so the card hangs left. Keep each tilt's
+ *  sign matching the side of the screen its slot sits on, or the card will hang
  *  off the edge. The card itself is never rotated — it is a bitmap frame.
- *  Years are first-release dates from the App Store listings.
- *  `crowned` marks the flagship — set it on one app, or the crown stops meaning
- *  anything. The type is spelled out so the optional field exists on every entry
- *  rather than only on the one that sets it. */
-const APPS: {
-  slug: string;
-  name: string;
-  desc: string;
-  year: string;
-  at: number;
-  tilt: number;
+ *  On a phone every slot sits in the band above the name, because the grown
+ *  portrait spans the full width down there.
+ *  A phase with more marks than there are slots wraps and overlaps two of them —
+ *  ugly on sight, which is the point. Add a slot rather than let one hide. */
+/** `hug` hands a slot's horizontal placement to CSS at sm: and up, pinning it
+ *  just outside the portrait's edge — see .mark-slot[data-hug] in globals.css.
+ *  The slots beside the portrait need it: a fixed percentage that clears the
+ *  portrait on a wide screen sits inside it on a narrow one, and the shoulders
+ *  swallowed two marks whole at tablet width. `gap` widens the offset so hugging
+ *  slots on the same side don't stack into a column. */
+const SLOTS: {
   place: string;
-  crowned?: boolean;
+  tilt: number;
+  hug?: "left" | "right";
+  gap?: string;
 }[] = [
   {
-    slug: "readio",
-    name: "Readio AI",
-    desc: "Turns PDFs and docs into audiobooks",
-    year: "2025",
-    at: 0.08,
-    tilt: -8,
     place: "left-[7%] top-[13%] sm:left-[9%] sm:top-[16%]",
+    tilt: -8,
   },
   {
-    slug: "habidots",
-    name: "Habidots",
-    desc: "Daily habit tracker built on streaks",
-    year: "2026",
-    at: 0.26,
-    tilt: 6,
     place: "right-[8%] top-[11%] sm:right-[10%] sm:top-[25%]",
+    tilt: 6,
   },
   {
-    slug: "buildsuite",
-    name: "BuildSuite",
-    desc: "Site, inventory and HR for builders",
-    year: "2024",
-    at: 0.44,
+    place: "left-[17%] top-[27%] sm:top-auto sm:bottom-[25%]",
     tilt: -5,
-    place: "left-[17%] top-[27%] sm:left-[14%] sm:top-auto sm:bottom-[25%]",
+    hug: "left",
   },
   {
-    slug: "travafa",
-    name: "Travafa",
-    desc: "Collaborative AI trip planner",
-    year: "2024",
-    at: 0.62,
+    place: "right-[16%] top-[30%] sm:top-auto sm:bottom-[14%]",
     tilt: 9,
-    place: "right-[16%] top-[30%] sm:right-[12%] sm:top-auto sm:bottom-[14%]",
-    crowned: true,
+    hug: "right",
+  },
+  {
+    place: "left-[6%] top-[2%] sm:top-[46%]",
+    tilt: -6,
+    hug: "left",
+    gap: "2.75rem",
+  },
+  {
+    place: "right-[7%] top-[2%] sm:top-[44%]",
+    tilt: 7,
+    hug: "right",
+    gap: "2.75rem",
   },
 ];
 
-/** Marks the flagship app. The emoji itself, not artwork — it inherits whatever
+/** One thing with a logo and a card: an app, an employer, a school. The three
+ *  phases differ only in what fills these fields.
+ *  `logo` is a path under /public. Leave it off and the mark renders as a
+ *  monogram tile instead, so a phase reads correctly before its artwork lands.
+ *  `tint` colours that monogram and is ignored once a logo exists.
+ *  `crowned` marks the flagship — set it on one mark in the whole file, or the
+ *  crown stops meaning anything. */
+type Mark = {
+  slug: string;
+  name: string;
+  meta: string;
+  desc: string;
+  logo?: string;
+  tint?: string;
+  crowned?: boolean;
+};
+
+/** The three sets, in the order the scroll walks them. `from`/`to` are absolute
+ *  scroll progress (0..1), and they are contiguous: each set starts its exit as
+ *  the next one starts arriving, so the stage is never crowded and never empty.
+ *  The last phase is special-cased below — it never exits, because the scroll
+ *  ends inside it and there is no room left to carry a mark back off. */
+const PHASES: { key: string; label: string; from: number; to: number; marks: Mark[] }[] = [
+  {
+    key: "projects",
+    label: "Things I've Built",
+    from: 0.0,
+    to: 0.34,
+    marks: [
+      {
+        slug: "readio",
+        name: "Readio AI",
+        desc: "Turns PDFs and docs into audiobooks",
+        meta: "2025",
+        logo: "/readio.png",
+      },
+      {
+        slug: "habidots",
+        name: "Habidots",
+        desc: "Daily habit tracker built on streaks",
+        meta: "2026",
+        logo: "/habidots.png",
+      },
+      {
+        slug: "buildsuite",
+        name: "BuildSuite",
+        desc: "Site, inventory and HR for builders",
+        meta: "2024",
+        logo: "/buildsuite.png",
+      },
+      {
+        slug: "travafa",
+        name: "Travafa",
+        desc: "Collaborative AI trip planner",
+        meta: "2024",
+        logo: "/travafa.png",
+        crowned: true,
+      },
+    ],
+  },
+  {
+    key: "companies",
+    // Oldest first, so the set builds up to the current role rather than
+    // counting back from it. Job titles are the one field still missing — the
+    // LinkedIn profile masks every one of them.
+    // Casing is LinkedIn's own: ZenDynamix, not Zendynamix.
+    label: "Where I've Worked",
+    from: 0.34,
+    to: 0.67,
+    marks: [
+      {
+        slug: "cognizant",
+        name: "Cognizant",
+        desc: "Role — fill in",
+        meta: "Feb 2021 — Mar 2022",
+        logo: "/cognizant.jpg",
+      },
+      {
+        slug: "zendynamix",
+        name: "ZenDynamix",
+        desc: "Role — fill in",
+        meta: "Mar 2022 — Mar 2023",
+        logo: "/zendynamix.jpg",
+      },
+      {
+        slug: "buildsuite-co",
+        name: "BuildSuite",
+        desc: "Role — fill in",
+        meta: "Jun 2023 — Dec 2024",
+        // The app icon, not the 200px company logo off LinkedIn: same mark at
+        // five times the resolution, and the coloured ground sits better on a
+        // dark page than the logo's white one. Appearing in both phases is the
+        // point — the product in one, the employer in the other.
+        logo: "/buildsuite.png",
+      },
+      {
+        slug: "travafa-co",
+        name: "Travafa",
+        desc: "Role — fill in",
+        meta: "Jan 2024 — Now",
+        // Same reasoning as BuildSuite above.
+        logo: "/travafa.png",
+      },
+    ],
+  },
+  {
+    key: "education",
+    // Names and dates are from the LinkedIn profile's structured data, which
+    // leaves both schools unmasked. The degrees are masked, so those two lines
+    // are still yours to fill. Crests are the profile's own 100px logos — small
+    // for the tile, so swap in larger art if you have it.
+    label: "Where I Studied",
+    from: 0.67,
+    to: 1.0,
+    marks: [
+      {
+        slug: "christ-college",
+        name: "Christ College of Engineering and Technology",
+        desc: "Degree — fill in",
+        meta: "2016 — 2020",
+        logo: "/christ-college.jpg",
+      },
+      {
+        slug: "amalorpavam",
+        name: "Amalorpavam Higher Secondary School",
+        desc: "Higher secondary",
+        meta: "2012 — 2016",
+        logo: "/amalorpavam.jpg",
+      },
+    ],
+  },
+];
+
+/** Flattened once at module scope, not per render: every mark paired with the
+ *  slot it sits in and the absolute scroll window it lives in. `at` spreads the
+ *  marks of a phase across the front of that phase's window; `end` is where the
+ *  whole set leaves together, which reads as a set rather than a queue. */
+const MARKS = PHASES.flatMap((phase, p) => {
+  // What the window has left once the last mark's fade-in, the hold and the
+  // exit are paid for. Floored at 0 so a phase too narrow to stagger drops to
+  // every mark arriving at once rather than going backwards.
+  const intro = Math.max(
+    0,
+    phase.to - phase.from - FADE_IN - HOLD - FADE_OUT,
+  );
+  const step = phase.marks.length > 1 ? intro / (phase.marks.length - 1) : 0;
+  // Well past 1, so the clamp in .mark-icon can never start the exit fade: the
+  // scroll runs out inside the last phase and its marks have to stay put.
+  const end = p === PHASES.length - 1 ? 9 : phase.to;
+
+  return phase.marks.map((mark, i) => ({
+    ...mark,
+    slot: SLOTS[i % SLOTS.length],
+    at: phase.from + i * step,
+    end,
+  }));
+});
+
+/** Stands in for a logo until the artwork lands: two letters, which is all that
+ *  fits the tile at icon size. One initial per word where there are two words,
+ *  and the first two letters where there is only one — a lone "T" reads as a
+ *  rendering failure rather than a placeholder. */
+function initials(name: string) {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!words.length) return "";
+  const pick =
+    words.length > 1
+      ? words[0][0] + words[1][0]
+      : words[0].slice(0, 2);
+  return pick.toUpperCase();
+}
+
+/** Marks the flagship. The emoji itself, not artwork — it inherits whatever
  *  crown the reader's platform ships, which is the point: it always looks native
  *  to their OS. Sized and placed in globals.css. */
 function Crown() {
   return (
-    <span aria-hidden className="app-crown">
+    <span aria-hidden className="mark-crown">
       👑
     </span>
   );
@@ -86,21 +260,32 @@ function Crown() {
 
 export function Hero() {
   const [revealed, setRevealed] = useState(false);
-  const [landed, setLanded] = useState(0);
+  // Bitmask over MARKS: bit i is set while mark i is hoverable. One number, so
+  // a scroll frame that changes nothing re-renders nothing.
+  const [live, setLive] = useState(0);
   const stage = useRef<HTMLDivElement>(null);
-  const landedRef = useRef(0);
+  const liveRef = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setRevealed(true), PORTRAIT_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
-  // Scroll writes one number, --sp (0..1), and CSS derives the growth from it.
-  // The portrait is anchored to the bottom edge and scales from it, both in CSS,
-  // so there is no geometry to measure here.
+  // Scroll writes one number, --sp (0..1), and CSS derives everything from it:
+  // the portrait's growth, which phase's label is showing, and which marks are
+  // on screen. The portrait is anchored to the bottom edge and scales from it,
+  // both in CSS, so there is no geometry to measure here.
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
+
+    // Scroll at which the portrait finishes growing: the end of the first phase,
+    // so the growth is spent on the projects reveal and the two phases after it
+    // play against a portrait already at full size. Written here rather than as
+    // a style prop because this effect is the sole owner of the stage's inline
+    // custom properties — React would otherwise be diffing a style attribute
+    // that --sp is mutating behind its back.
+    el.style.setProperty("--grown-by", String(PHASES[0].to));
 
     let forced = false;
     let frame = 0;
@@ -119,14 +304,16 @@ export function Hero() {
         setRevealed(true);
       }
 
-      // How many icons have fully arrived. Only those accept a hover, so a
-      // card can never be summoned by an icon that isn't visible yet. APPS is
-      // ordered by `at`, so this count is a prefix — four re-renders in total,
-      // not one per frame.
-      const n = APPS.filter((app) => progress >= app.at + ICON_FADE).length;
-      if (n !== landedRef.current) {
-        landedRef.current = n;
-        setLanded(n);
+      // Only a mark that has fully arrived and has not begun leaving accepts a
+      // hover, so a card can never be summoned by a mark nobody can see.
+      let mask = 0;
+      for (let i = 0; i < MARKS.length; i++) {
+        const mark = MARKS[i];
+        if (progress >= mark.at + FADE_IN && progress < mark.end) mask |= 1 << i;
+      }
+      if (mask !== liveRef.current) {
+        liveRef.current = mask;
+        setLive(mask);
       }
     };
 
@@ -151,49 +338,102 @@ export function Hero() {
       className="stage absolute inset-0"
     >
       {/* Background layer: behind the type and the portrait, above the wash.
-          The layer itself never takes pointer events — only landed icons do.
+          The layer itself never takes pointer events — only live marks do.
           Carries no z-index on purpose: a z-index here would make this a
           stacking context and trap the hover cards inside it, under the portrait.
-          Without one, the icons still paint below the type and the portrait —
-          they are auto-level and come first in the DOM — while .app-card can
+          Without one, the marks still paint below the type and the portrait —
+          they are auto-level and come first in the DOM — while .mark-card can
           raise itself above both. Nothing in this subtree may take a z-index. */}
       <div className="pointer-events-none absolute inset-0">
-        {APPS.map((app, i) => (
-          <div
-            key={app.slug}
-            data-landed={i < landed ? "" : undefined}
-            data-lean={app.tilt < 0 ? "left" : "right"}
-            className={`app-slot absolute ${app.place}`}
-            style={
-              { "--at": app.at, "--tilt": `${app.tilt}deg` } as CSSProperties
-            }
-            tabIndex={0}
-          >
-            {/* The icon carries the scroll-driven reveal; the card is its
-                sibling so it inherits neither the tilt nor the scale. The crown
-                is inside it, so it does inherit both — it arrives with the app
-                it belongs to and leans at the same angle. */}
-            <div className="app-icon">
-              {app.crowned && <Crown />}
-              <Image
-                src={`/${app.slug}.png`}
-                alt=""
-                width={1024}
-                height={1024}
-                sizes="(min-width: 640px) 7vw, 13vw"
-                className="app-icon-art block h-full w-full"
-              />
-            </div>
+        {MARKS.map((mark, i) => {
+          const on = (live & (1 << i)) !== 0;
+          return (
+            <div
+              key={mark.slug}
+              data-live={on ? "" : undefined}
+              data-lean={mark.slot.tilt < 0 ? "left" : "right"}
+              data-hug={mark.slot.hug}
+              className={`mark-slot absolute ${mark.slot.place}`}
+              style={
+                {
+                  "--at": mark.at,
+                  "--end": mark.end,
+                  "--tilt": `${mark.slot.tilt}deg`,
+                  ...(mark.slot.gap && { "--hug-gap": mark.slot.gap }),
+                } as CSSProperties
+              }
+              // Off the tab order while invisible, so tabbing never lands on a
+              // mark two phases away and opens its card over the wrong set.
+              tabIndex={on ? 0 : -1}
+            >
+              {/* The icon carries the scroll-driven reveal; the card is its
+                  sibling so it inherits neither the tilt nor the scale. The crown
+                  is inside it, so it does inherit both — it arrives with the mark
+                  it belongs to and leans at the same angle. */}
+              <div className="mark-icon">
+                {mark.crowned && <Crown />}
+                {mark.logo ? (
+                  <Image
+                    src={mark.logo}
+                    alt=""
+                    width={1024}
+                    height={1024}
+                    sizes="(min-width: 640px) 7vw, 13vw"
+                    className="mark-art block h-full w-full"
+                  />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="mark-art mark-monogram"
+                    style={{ "--tint": mark.tint } as CSSProperties}
+                  >
+                    {initials(mark.name)}
+                  </span>
+                )}
+              </div>
 
-            <div className="app-card">
-              <p className="app-card-head">
-                <span className="app-card-name">{app.name}</span>
-                <span className="app-card-year">{app.year}</span>
-              </p>
-              <p className="app-card-desc">{app.desc}</p>
+              <div className="mark-card">
+                <p className="mark-card-head">
+                  <span className="mark-card-name">{mark.name}</span>
+                  <span className="mark-card-meta">{mark.meta}</span>
+                </p>
+                <p className="mark-card-desc">{mark.desc}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+      </div>
+
+      {/* Names the set on stage. Pinned near the top edge rather than left in
+          the eyebrow under the name: by the last phase the portrait has grown
+          up over that spot, and a label nobody can read is worse than none.
+          z-25 clears the portrait (20) but stays under the hover cards (30), so
+          a card opening near the top still wins the overlap.
+          Every label shares one grid cell, so the cell is as wide as the longest
+          of them and the rules either side hold still as the words cross-fade. */}
+      <div className="phase-rail pointer-events-none absolute inset-x-0 top-[7%] z-[25] flex items-center justify-center px-5">
+        <p className="eyebrow font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/60 sm:text-xs">
+          {PHASES.map((phase, p) => (
+            <span
+              key={phase.key}
+              className="eyebrow-label"
+              style={
+                {
+                  "--from": phase.from,
+                  // The last label stays for the same reason its marks do.
+                  "--to": p === PHASES.length - 1 ? 9 : phase.to,
+                } as CSSProperties
+              }
+            >
+              {/* Each label carries its own rules rather than sharing a pair
+                  parked on the rail: on the beat between two phases every label
+                  is at zero, and shared rules would sit there framing nothing. */}
+              <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
+              {phase.label}
+              <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
+            </span>
+          ))}
+        </p>
       </div>
 
       <div className="flex h-full flex-col items-center justify-center px-5 sm:px-6">
@@ -201,15 +441,17 @@ export function Hero() {
           {/* Lifts once the portrait lands, so the pair stays optically centred,
               then recedes as the portrait grows over it. */}
           <div className="type-lift flex flex-col items-center">
-            <div
-              className="rise flex items-center gap-4"
-              style={{ animationDelay: "80ms" }}
-            >
-              <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
-              <p className="font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/55 sm:text-xs">
-                Scroll to Know More
-              </p>
-              <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
+            {/* The rise wrapper and the fade are separate elements on purpose:
+                .rise fills its animation forwards, so an opacity set on the same
+                element would never win against it. */}
+            <div className="rise" style={{ animationDelay: "80ms" }}>
+              <div className="scroll-hint flex items-center gap-4">
+                <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
+                <p className="font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/55 sm:text-xs">
+                  Scroll to Know More
+                </p>
+                <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
+              </div>
             </div>
 
             {/* "Baranidharan" is one unbreakable 12-character word that cannot
@@ -240,9 +482,13 @@ export function Hero() {
         <div className="portrait-grow">
           <div className="portrait-in relative">
             <span className="portrait-glow" />
-            {/* sizes mirrors --target in globals.css — the width the portrait
-                is laid out at, which is the width it reaches fully grown. A
-                narrower hint would fetch a file the grown portrait outruns. */}
+            {/* sizes tracks --target in globals.css — the width the portrait is
+                laid out at, which is the width it reaches fully grown. A
+                narrower hint would fetch a file the grown portrait outruns.
+                It omits --target's third cap (the one keeping a lane clear for
+                the hugging marks), so on the narrow viewports that cap bites it
+                over-estimates. That is the safe direction: a slightly larger
+                file, never a soft one. */}
             <Image
               src="/hero.png"
               alt=""

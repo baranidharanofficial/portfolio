@@ -72,7 +72,28 @@
       "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --allow-file-access-from-files --force-device-scale-factor=3 --window-size=560,230 --screenshot=/private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown5.png file:///private/tmp/claude-501/-Users-baranidharan-Desktop-SSa-Personal-Apps-portfolio/61d5fc39-696a-49bb-ada8-6cc724cf28ed/scratchpad/crown5.html)",
       "Bash(ssh-add -l)",
       "Bash(gh auth *)",
-      "Bash(ssh -T -o StrictHostKeyChecking=accept-new -o BatchMode=yes github-personal)"
+      "Bash(ssh -T -o StrictHostKeyChecking=accept-new -o BatchMode=yes github-personal)",
+      "Bash(node -e \"console.log\\('ws:', typeof WebSocket\\)\")",
+      "Bash(node shot.mjs http://localhost:3000 1440 900 0.58 4200 e-0.58.png)",
+      "Bash(REDUCED=1 node shot.mjs http://localhost:3000 1440 900 0.58 4200 rm.png)",
+      "Bash(pkill -f \"next dev\")",
+      "WebFetch(domain:www.linkedin.com)",
+      "WebFetch(domain:in.linkedin.com)",
+      "Bash(curl -sSL -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/126.0 Safari/537.36\" -H \"Accept-Language: en-US,en;q=0.9\" -o li.html -w \"http=%{http_code} bytes=%{size_download}\\\\n\" \"https://in.linkedin.com/in/baranidharanb\")",
+      "Bash(node shot.mjs http://localhost:3000 1440 900 0.6 4200 co.png)",
+      "Bash(node shot.mjs http://localhost:3000 390 844 1 4200 edum.png)",
+      "Bash(node shot.mjs http://localhost:3000 1440 900 0.62 4200 fin-hov.png \".mark-slot[data-live] .mark-icon\")",
+      "Bash(node overlap.mjs)",
+      "Bash(node shot.mjs http://localhost:3000 834 1112 0.62 4500 tab.png)",
+      "Bash(node shot.mjs http://localhost:3000 834 1112 0.2 4500 tab2.png)",
+      "Bash(node shot.mjs http://localhost:3000 834 1112 0.62 4500 fix-tab.png)",
+      "Bash(node shot.mjs http://localhost:3000 1440 900 0.62 4500 fix-desk.png)",
+      "Bash(node shot.mjs http://localhost:3000 660 1200 0.62 4500 fix-narrow.png)",
+      "Bash(node edges.mjs)",
+      "Bash(node shot.mjs http://localhost:3000 660 1200 0.62 4500 ok-narrow.png)",
+      "Bash(node shot.mjs http://localhost:3000 390 844 0.2 4500 ok-mob.png)",
+      "Bash(node shot.mjs http://localhost:3000 1440 900 0.2 4500 ok-desk.png)",
+      "Bash(node shot.mjs http://localhost:3000 834 1112 0.62 4500 hov-tab.png \".mark-slot[data-hug='right'][data-live] .mark-icon\")"
     ]
   }
 }

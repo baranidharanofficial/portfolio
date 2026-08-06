@@ -3,9 +3,12 @@ import { Hero } from "@/components/hero";
 export default function Home() {
   return (
     <main className="flex-1">
-      {/* Two viewports tall, so there is exactly one viewport of scroll to
-          drive the portrait from its resting size up to 50vw. */}
-      <div className="h-[200svh]">
+      {/* Five viewports tall, so there are four of scroll: one to drive the
+          portrait from its resting size up to 50vw, and — because the three
+          phases split that same 0..1 progress — about 1.3 viewports each for
+          projects, companies and education. Shorten this and the sets start
+          overtaking each other. */}
+      <div className="h-[500svh]">
         {/* Pinned: the section is the screen, which is what the portrait's
             bottom edge is anchored to. */}
         <section className="sticky top-0 h-[100svh] overflow-hidden">
