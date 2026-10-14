@@ -214,8 +214,13 @@ const SEAT = 360 / ALL.length;
  *  passes through each mark squarely in the middle of its band. */
 const seatAt = (p: number) => clamp(p * STEPS.length - 1.5, 0, ALL.length - 1);
 
-/** The halo's size on the intro, as a share of its size on the reel. */
-const INTRO_HALO = 0.7;
+/** The halo's size on the intro. On a wide screen, a share of its size on the
+ *  reel. On a tall one, its half-width as a share of the resting portrait's
+ *  width instead: a phone's reel halo is sized to the screen, and how much the
+ *  portrait shrinks for the intro varies with the phone's height, so any fixed
+ *  share left one phone's halo a cramped cap and another's wider than the
+ *  start button. */
+const INTRO_HALO = { wide: 0.7, tallHalfWidth: 0.44 };
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
@@ -291,7 +296,11 @@ function layout(W: number, H: number, step: number, boxH: number) {
   // the intro so it reads as a small crown over the resting portrait rather
   // than a ring wider than the figure, and opening out to full size as the
   // reel starts.
-  const halo = intro ? INTRO_HALO : 1;
+  const halo = !intro
+    ? 1
+    : tall
+      ? (INTRO_HALO.tallHalfWidth * rest) / (tallRx * scale)
+      : INTRO_HALO.wide;
   // On the intro the portrait rests small on the screen's bottom edge, with no
   // box to stand on; it rises onto the box as the reel starts.
   const base = intro ? H : bottom;
