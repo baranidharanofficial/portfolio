@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,13 @@ const silkscreen = Silkscreen({
 export const metadata: Metadata = {
   title: "Baranidharan",
   description: "Portfolio of Baranidharan.",
+};
+
+/** cover, so the page runs under a phone's home indicator and the text box —
+ *  attached to the bottom edge — can pad itself clear of it with
+ *  env(safe-area-inset-bottom). */
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

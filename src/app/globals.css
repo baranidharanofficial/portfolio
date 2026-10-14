@@ -215,7 +215,6 @@ body {
 .halo-orbit,
 .halo-mark,
 .halo-portrait,
-.halo-tail,
 .halo-box {
   position: absolute;
   left: 0;
@@ -547,20 +546,12 @@ body {
 
 /* --- Text box ------------------------------------------------------------ */
 
-/* Dashed lead from the text box down to the mark it describes — tall screens
-   only, where the two are stacked. */
-.halo-tail {
-  z-index: 5;
-  width: 0;
-  border-left: 2px dashed color-mix(in srgb, var(--accent-hi) 60%, transparent);
-  transition: transform 0.55s var(--ease), height 0.55s var(--ease);
-  pointer-events: none;
-}
-
-/* A 32-bit dialog box. Everything is a whole multiple of --px, the box's notion
-   of one pixel; break that grid and the frame stops looking drawn. Two stacked
-   notched plates make the frame — ::before the full accent plate, ::after the
-   dark fill inset one pixel — because a border can't keep stepped corners. */
+/* A 32-bit dialog box, attached to the bottom edge of the screen. Everything
+   is a whole multiple of --px, the box's notion of one pixel; break that grid
+   and the frame stops looking drawn. Two stacked plates make the frame —
+   ::before the full accent plate, ::after the dark fill inset one pixel on the
+   top and sides — because a border can't keep stepped corners. The bottom has
+   no frame and no notches: it runs off the screen edge. */
 .halo-box {
   --px: 5px;
   z-index: 7;
@@ -568,11 +559,16 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: calc(4 * var(--px));
-  /* Zero-blur drop shadow traces the notched silhouette — a retro shadow is an
-     offset copy, not a haze. It also makes the box a stacking context, which is
-     what lets the plates below sit at z-index -1 behind its own text. */
-  filter: drop-shadow(var(--px) var(--px) 0 rgba(0, 0, 0, 0.85));
-  transition: transform 0.55s var(--ease), opacity 0.4s ease;
+  /* Clear of a phone's home indicator. */
+  padding-bottom: calc(4 * var(--px) + env(safe-area-inset-bottom));
+  /* Zero-blur shadow cast upward onto the portrait — a retro shadow is an
+     offset copy, not a haze. It also makes the box a stacking context, which
+     is what lets the plates below sit at z-index -1 behind its own text. */
+  filter: drop-shadow(0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.55));
+  transition:
+    transform 0.55s var(--ease),
+    width 0.55s var(--ease),
+    opacity 0.4s ease;
 }
 
 [data-step="intro"] .halo-box {
@@ -585,17 +581,15 @@ body {
   content: "";
   position: absolute;
   z-index: -1;
+  /* Only the top corners lose a pixel, which is what makes them read as
+     drawn; the bottom ones meet the screen edge square. */
   clip-path: polygon(
     var(--px) 0,
     calc(100% - var(--px)) 0,
     calc(100% - var(--px)) var(--px),
     100% var(--px),
-    100% calc(100% - var(--px)),
-    calc(100% - var(--px)) calc(100% - var(--px)),
-    calc(100% - var(--px)) 100%,
-    var(--px) 100%,
-    var(--px) calc(100% - var(--px)),
-    0 calc(100% - var(--px)),
+    100% 100%,
+    0 100%,
     0 var(--px),
     var(--px) var(--px)
   );
@@ -607,7 +601,7 @@ body {
 }
 
 .halo-box::after {
-  inset: var(--px);
+  inset: var(--px) var(--px) 0;
   background-color: var(--panel);
   background-image: repeating-linear-gradient(
     to bottom,
@@ -671,6 +665,44 @@ body {
   font-size: 13px;
   line-height: 19px;
   color: var(--ink-2);
+}
+
+/* Store links under an entry: small framed chips in the box's own accent, the
+   same voice as the nav buttons beside them. */
+.halo-stores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.halo-store {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 2px solid var(--accent-lo);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-hi);
+  transition:
+    border-color 0.2s steps(3),
+    color 0.2s steps(3);
+}
+
+.halo-store:hover,
+.halo-store:focus-visible {
+  outline: none;
+  border-color: var(--accent-hi);
+  color: var(--ink);
+}
+
+.halo-store-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .halo-box-foot {
@@ -867,7 +899,6 @@ body {
   }
   /* Steps still change — that is the content — but by cutting, not gliding. */
   .halo-glow,
-  .halo-tail,
   .halo-box,
   .halo-header,
   .halo-intro {
