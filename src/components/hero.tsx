@@ -1,113 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-/** How long the name holds the stage alone before the portrait arrives. */
-const PORTRAIT_DELAY_MS = 3000;
-
-/** How long a mark takes to fade in, as a share of the whole scroll. Must match
- *  the 0.09 divisor in .mark-icon — it is also when the mark becomes hoverable. */
-const FADE_IN = 0.09;
-
-/** How long the set takes to fade back out. Must match the 0.05 divisor in
- *  .mark-icon. */
-const FADE_OUT = 0.05;
-
-/** Where the contact pill arrives, and where it leaves again. Two thresholds
- *  rather than one: a single one sits on the knife edge of a rubber-band scroll
- *  or a trackpad's last pixel and flickers the pill in and out. In at the tail
- *  of the last phase, out a little earlier, so the gap has to be crossed
- *  deliberately. */
-const CONTACT_IN = 0.96;
-const CONTACT_OUT = 0.93;
-
-/** Scroll a phase spends with its whole set on screen and nothing moving. This
- *  is the part worth reading, so it is reserved first and the staggered intro
- *  gets whatever the window has left — reserve it the other way round and the
- *  last mark of a phase lands just in time to start fading out again. */
-const HOLD = 0.08;
-
-/** Where marks sit on the stage, in reveal order. Sides alternate so a phase
- *  with only two marks still reads as balanced, and every slot clears the
- *  centre, which the name and the growing portrait own.
- *  `tilt` is degrees, and its sign picks the side the hover card hangs off:
- *  negative dips the mark's left side, so the card hangs left. Keep each tilt's
- *  sign matching the side of the screen its slot sits on — that is also the side
- *  with the most room for the card, so a centre slot's card still has somewhere
- *  to go. The card itself is never rotated — it is a bitmap frame.
- *  From lg: up, slots sit either side of the portrait.
- *  Below lg: the portrait fills the width, so they all live in the band above
- *  the name — and they trace an arc across it rather than stacking into two
- *  columns. The arc is what fits the space: the head owns the middle and rises
- *  highest, so the slots nearest the centre sit highest and each pair steps down
- *  as it moves out, following the dome of empty sky over the portrait.
- *  Ordered by how many marks a phase has rather than along the curve: the crown
- *  pair first so a two-mark phase gets a balanced pair high in the band, then
- *  the two ends so a four-mark phase spans the whole arc, and only then the
- *  pair between them, which just fills the curve in at five and six. Taking them
- *  in order along the curve instead would leave a four-mark phase — which is two
- *  of the three phases here — crowded into one half of it.
- *  A phase with more marks than there are slots wraps and overlaps two of them —
- *  ugly on sight, which is the point. Add a slot rather than let one hide.
- *
- *  `hug` hands a slot's horizontal placement to CSS at lg: and up, pinning it
- *  just outside the portrait's edge — see .mark-slot[data-hug] in globals.css.
- *  The slots beside the portrait need it: a fixed percentage that clears the
- *  portrait on a wide screen sits inside it on a narrow one, and the shoulders
- *  swallowed two marks whole at tablet width. `gap` widens the offset so hugging
- *  slots on the same side don't stack into a column. Both are lg:-only, so they
- *  have no bearing on the arc. */
-const SLOTS: {
-  place: string;
-  tilt: number;
-  hug?: "left" | "right";
-  gap?: string;
-}[] = [
-  // Crown of the arc: nearest the centre, so highest — over the head below and
-  // clear of the phase rail above. First, so a two-mark phase takes this pair.
-  {
-    place: "left-[20%] top-[10%] lg:left-[9%] lg:top-[16%]",
-    tilt: -8,
-  },
-  {
-    place: "right-[20%] top-[10%] lg:right-[10%] lg:top-[25%]",
-    tilt: 6,
-  },
-  // Ends of the arc: hard against the edges and lowest, where the portrait has
-  // narrowed to nothing and there is the most room to drop. Taken third and
-  // fourth so a four-mark phase spans the whole curve rather than crowding one
-  // end of it.
-  {
-    place: "left-[3%] top-[29%] lg:top-auto lg:bottom-[25%]",
-    tilt: -5,
-    hug: "left",
-  },
-  {
-    place: "right-[3%] top-[29%] lg:top-auto lg:bottom-[14%]",
-    tilt: 9,
-    hug: "right",
-  },
-  // Between the two, filling the arc in when a phase runs to five or six.
-  {
-    place: "left-[11%] top-[19%] lg:top-[46%]",
-    tilt: -6,
-    hug: "left",
-    gap: "2.75rem",
-  },
-  {
-    place: "right-[11%] top-[19%] lg:top-[44%]",
-    tilt: 7,
-    hug: "right",
-    gap: "2.75rem",
-  },
-];
-
-/** One thing with a logo and a card: an app, an employer, a school. The three
- *  phases differ only in what fills these fields.
- *  `logo` is a path under /public. Leave it off and the mark renders as a
- *  monogram tile instead, so a phase reads correctly before its artwork lands.
- *  `tint` colours that monogram and is ignored once a logo exists.
+/** One thing with a logo and an entry in the text box: an app, an employer, a
+ *  school. The three sections differ only in what fills these fields.
  *  `crowned` marks the flagship — set it on one mark in the whole file, or the
  *  crown stops meaning anything. */
 type Mark = {
@@ -115,318 +12,451 @@ type Mark = {
   name: string;
   meta: string;
   desc: string;
-  logo?: string;
-  tint?: string;
+  logo: string;
   crowned?: boolean;
 };
 
-/** The three sets, in the order the scroll walks them. `from`/`to` are absolute
- *  scroll progress (0..1), and they are contiguous: each set starts its exit as
- *  the next one starts arriving, so the stage is never crowded and never empty.
- *  The last phase is special-cased below — it never exits, because the scroll
- *  ends inside it and there is no room left to carry a mark back off. */
-const PHASES: { key: string; label: string; from: number; to: number; marks: Mark[] }[] = [
+type Section = { key: string; label: string; short: string; marks: Mark[] };
+
+const SECTIONS: Section[] = [
   {
-    key: "projects",
-    label: "Things I've Built",
-    from: 0.0,
-    to: 0.34,
+    key: "built",
+    label: "Things I've built",
+    short: "Built",
     marks: [
       {
         slug: "readio",
         name: "Readio AI",
-        desc: "Turns PDFs and docs into audiobooks",
         meta: "2025",
+        desc: "Turns PDFs, EPUBs, web articles and photographed pages into audiobooks. It finds the chapters, reads them aloud and keeps playing in the background.",
         logo: "/readio.png",
       },
       {
         slug: "habidots",
         name: "Habidots",
-        desc: "Daily habit tracker built on streaks",
         meta: "2026",
+        desc: "A habit tracker where every day is a dot. Build streaks, set reminders, earn badges, read your progress in analytics and keep habits on your home screen.",
         logo: "/habidots.png",
       },
       {
         slug: "buildsuite",
         name: "BuildSuite",
-        desc: "Site, inventory and HR for builders",
         meta: "2024",
+        desc: "Construction management for builders and contractors: follow every site, keep materials and inventory in check, and handle HR for the crew from one app.",
         logo: "/buildsuite.png",
       },
       {
         slug: "travafa",
         name: "Travafa",
-        desc: "Collaborative AI trip planner",
         meta: "2024",
+        desc: "An AI trip planner you build with friends. Plan the itinerary together, get AI suggestions on where to go, and split the costs in one shared trip.",
         logo: "/travafa.png",
         crowned: true,
+      },
+      {
+        slug: "dog-on-walk",
+        name: "Dog on Walk",
+        meta: "2026",
+        desc: "A Pomodoro focus timer: while you focus, your dog walks. The scene follows the real time and weather, the dog can match your own, and friends can walk together.",
+        logo: "/dog-on-walk.png",
+      },
+      {
+        slug: "delights",
+        name: "Delights",
+        meta: "2026",
+        desc: "The website for a milkshake and snack shop, plus a staff-only POS behind Google sign-in that runs the counter, kitchen orders, menu, inventory and reports.",
+        logo: "/delights.png",
       },
     ],
   },
   {
-    key: "companies",
+    key: "worked",
     // Oldest first, so the set builds up to the current role rather than
     // counting back from it — the titles climb with it.
     // Casing is LinkedIn's own: ZenDynamix, not Zendynamix.
-    label: "Where I've Worked",
-    from: 0.34,
-    to: 0.67,
+    label: "Where I've worked",
+    short: "Worked",
     marks: [
       {
         slug: "cognizant",
         name: "Cognizant",
-        desc: "Programmer Analyst",
         meta: "Feb 2021 — Mar 2022",
+        desc: "Programmer Analyst",
         logo: "/cognizant.jpg",
       },
       {
         slug: "zendynamix",
         name: "ZenDynamix",
-        desc: "React & Flutter Developer",
         meta: "Mar 2022 — Mar 2023",
+        desc: "React & Flutter Developer",
         logo: "/zendynamix.jpg",
       },
       {
-        slug: "buildsuite-co",
+        slug: "buildsuite",
         name: "BuildSuite",
-        desc: "Flutter Developer",
         meta: "Jun 2023 — Dec 2024",
+        desc: "Flutter Developer",
         // The app icon, not the 200px company logo off LinkedIn: same mark at
-        // five times the resolution, and the coloured ground sits better on a
-        // dark page than the logo's white one. Appearing in both phases is the
-        // point — the product in one, the employer in the other.
+        // five times the resolution. Appearing in both sections is the point —
+        // the product in one, the employer in the other.
         logo: "/buildsuite.png",
       },
       {
-        slug: "travafa-co",
+        slug: "travafa",
         name: "Travafa",
-        // U+2011 non-breaking hyphen, so the measure below breaks the line
-        // after "and" rather than mid-word at "co-".
-        desc: "Front-end lead and co‑founder",
         meta: "Jan 2024 — Now",
-        // Same reasoning as BuildSuite above.
+        // U+2011 non-breaking hyphen, so the line breaks after "and" rather
+        // than mid-word at "co-".
+        desc: "Front-end lead and co‑founder",
         logo: "/travafa.png",
       },
     ],
   },
   {
-    key: "education",
-    // Names and dates are from the LinkedIn profile's structured data, which
-    // leaves both schools unmasked; the degrees were masked there and came from
-    // you. Crests are the profile's own 100px logos — small for the tile, so
-    // swap in larger art if you have it.
-    label: "Where I Studied",
-    from: 0.67,
-    to: 1.0,
+    key: "studied",
+    label: "Where I studied",
+    short: "Studied",
     marks: [
       {
         slug: "christ-college",
         name: "Christ College of Engineering and Technology",
-        desc: "B.Tech Electronics and Communication",
         meta: "2016 — 2020",
+        desc: "B.Tech Electronics and Communication",
         logo: "/christ-college.jpg",
       },
       {
         slug: "amalorpavam",
         name: "Amalorpavam Higher Secondary School",
-        desc: "Higher secondary",
         meta: "2012 — 2016",
+        desc: "Higher secondary",
         logo: "/amalorpavam.jpg",
       },
     ],
   },
 ];
 
-/** Flattened once at module scope, not per render: every mark paired with the
- *  slot it sits in and the absolute scroll window it lives in. `at` spreads the
- *  marks of a phase across the front of that phase's window; `end` is where the
- *  whole set leaves together, which reads as a set rather than a queue. */
-const MARKS = PHASES.flatMap((phase, p) => {
-  // What the window has left once the last mark's fade-in, the hold and the
-  // exit are paid for. Floored at 0 so a phase too narrow to stagger drops to
-  // every mark arriving at once rather than going backwards.
-  const intro = Math.max(
-    0,
-    phase.to - phase.from - FADE_IN - HOLD - FADE_OUT,
-  );
-  const step = phase.marks.length > 1 ? intro / (phase.marks.length - 1) : 0;
-  // Well past 1, so the clamp in .mark-icon can never start the exit fade: the
-  // scroll runs out inside the last phase and its marks have to stay put.
-  const end = p === PHASES.length - 1 ? 9 : phase.to;
+/** The reel, one entry per scroll step: the intro, every mark in order, then
+ *  the contact screen. Scroll is the only source of truth for which step is on
+ *  screen — the arrows, tabs and icons all just scroll the page to a step. */
+type Step =
+  | { kind: "intro" }
+  | { kind: "mark"; s: number; i: number }
+  | { kind: "contact" };
 
-  return phase.marks.map((mark, i) => ({
-    ...mark,
-    slot: SLOTS[i % SLOTS.length],
-    at: phase.from + i * step,
-    end,
-  }));
-});
-
-/** Stands in for a logo until the artwork lands: two letters, which is all that
- *  fits the tile at icon size. One initial per word where there are two words,
- *  and the first two letters where there is only one — a lone "T" reads as a
- *  rendering failure rather than a placeholder. */
-function initials(name: string) {
-  const words = name.split(/\s+/).filter(Boolean);
-  if (!words.length) return "";
-  const pick =
-    words.length > 1
-      ? words[0][0] + words[1][0]
-      : words[0].slice(0, 2);
-  return pick.toUpperCase();
-}
-
-/** Marks the flagship. The emoji itself, not artwork — it inherits whatever
- *  crown the reader's platform ships, which is the point: it always looks native
- *  to their OS. Sized and placed in globals.css. */
-function Crown() {
-  return (
-    <span aria-hidden className="mark-crown">
-      👑
-    </span>
-  );
-}
-
-/** Marks in the pill. Inline SVG rather than an icon package: three glyphs is
- *  not worth a dependency, and inline they inherit currentColor and so follow
- *  the link's hover on their own. viewBox 24 on all three, so they optically
- *  match at one size. */
-const LINKS: { label: string; href: string; icon: React.ReactNode }[] = [
-  {
-    label: "Instagram",
-    href: "https://instagram.com/baranidharan_b_",
-    // Three pieces — the rounded frame, the lens, the flash. The two rings are
-    // drawn as outer-then-inner subpaths and filled evenodd, so the middle is
-    // punched out rather than depending on which way each arc happens to sweep.
-    icon: (
-      <>
-        <path
-          fillRule="evenodd"
-          d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4A5.8 5.8 0 0 1 16.2 22H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm0 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.8Z"
-        />
-        <path
-          fillRule="evenodd"
-          d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"
-        />
-        <circle cx="17.45" cy="6.55" r="1.35" />
-      </>
-    ),
-  },
-  {
-    label: "LinkedIn",
-    href: "https://www.linkedin.com/in/baranidharanb",
-    icon: (
-      <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9h4v12H3V9Zm6 0h3.8v1.71h.05a4.2 4.2 0 0 1 3.77-2.07c4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.44c0-1.3-.02-2.97-1.81-2.97-1.81 0-2.09 1.42-2.09 2.88V21H9V9Z" />
-    ),
-  },
-  {
-    label: "Email",
-    // mailto, not a form: there is no backend here, and a link hands the reader
-    // straight to the client they already have.
-    href: "mailto:baranidharan.balamurugan@travafa.com",
-    icon: (
-      <path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm.4 2L12 12.6 20.6 7H3.4ZM20 9.3l-8 5.2-8-5.2V17h16V9.3Z" />
-    ),
-  },
+const STEPS: Step[] = [
+  { kind: "intro" },
+  ...SECTIONS.flatMap((sec, s) =>
+    sec.marks.map((_, i): Step => ({ kind: "mark", s, i })),
+  ),
+  { kind: "contact" },
 ];
 
+/** Index of each section's first step, for the level tabs and for icons in the
+ *  contact ring, which jump back to where their mark was introduced. */
+const FIRST_STEP = SECTIONS.map((_, s) =>
+  STEPS.findIndex((st) => st.kind === "mark" && st.s === s),
+);
+
+/** Every distinct logo, in order of first appearance — BuildSuite and Travafa
+ *  appear in two sections but get one seat in the contact ring. */
+const RING = SECTIONS.flatMap((sec, s) =>
+  sec.marks.map((m, i) => ({ s, i, logo: m.logo })),
+).filter((m, n, all) => all.findIndex((o) => o.logo === m.logo) === n);
+
+/** Height of the tallest text box in the dock arrangement, in px — the yardstick
+ *  layout() uses to decide whether docking fits. Raise it if a longer entry is
+ *  added. */
+const DOCK_BOX_H = 236;
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
+/** Rounds for inline styles: sub-pixel noise past a tenth only churns the DOM. */
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Where everything sits for a screen of W×H on step `step`. One function, no
+ *  breakpoints: the marks ride an ellipse around the head whose size comes from
+ *  the screen, so a seventh mark or an odd aspect ratio needs no hand-tuning.
+ *  It picks one of three arrangements, by what fits rather than by width:
+ *  - dock: the text box sits over the portrait's hem — any wide screen tall
+ *    enough that the box clears the chin.
+ *  - split: portrait and ring on the left, text box on the right — a wide
+ *    screen too short to dock, like a 1280×720 laptop.
+ *  - tall: text box stacked above the ring — phones, portrait tablets, and the
+ *    narrow-and-short screens that have room for neither of the others. */
+function layout(W: number, H: number, step: number, boxH: number) {
+  const st = STEPS[step];
+  const intro = st.kind === "intro";
+  const contact = st.kind === "contact";
+
+  const g = W < 640 ? 16 : W < 1024 ? 32 : 48;
+
+  // Docking works while the chin (0.45P up from the bottom) stays above the
+  // box. Judged against the tallest docked box the reel has (Things I've
+  // built, three lines of description) rather than the measured one, so a
+  // screen keeps one arrangement for the whole scroll instead of switching
+  // between sections whose boxes differ in height.
+  const dockP = Math.min(H * 0.8, W * 0.48);
+  const dockFits = H - 0.45 * dockP <= H - g - DOCK_BOX_H - 8;
+  const mode: "tall" | "dock" | "split" =
+    H > W * 1.15 ? "tall" : dockFits ? "dock" : W >= 900 ? "split" : "tall";
+  const tall = mode === "tall";
+
+  const icon = tall ? clamp(W * 0.16, 52, 88) : clamp(W * 0.07, 64, 96);
+  // Every mark is laid out at the focused size and scaled down from it, so the
+  // focused one is the only one drawn 1:1 and nothing is ever scaled up.
+  const front = icon * 1.25;
+  const lead = contact ? icon * 0.62 : front;
+
+  const headerTop = tall ? g : 32;
+  const headerH = tall ? 40 : 48;
+  const headerEnd = headerTop + headerH;
+
+  let boxW: number;
+  let boxX: number;
+  let boxY: number;
+  if (mode === "tall") {
+    boxW = W - 2 * g;
+    boxX = g;
+    boxY = headerEnd + (W < 640 ? 16 : 24);
+  } else if (mode === "dock") {
+    boxW = Math.min(640, W - 2 * g);
+    boxX = (W - boxW) / 2;
+    boxY = H - g - boxH;
+  } else {
+    boxW = Math.min(560, W * 0.42);
+    boxX = W - g - boxW;
+    boxY = clamp((H - boxH) / 2, headerEnd + 24, H - g - boxH);
+  }
+
+  // The column the portrait and ring live in: the whole screen, except in a
+  // split, where it is everything left of the box.
+  const colW = mode === "split" ? boxX - 24 : W;
+  const sx = colW / 2;
+
+  // On a tall screen the ring is a literal halo: a flat ellipse whose centre
+  // sits on the top of the hair (0.12P below the portrait's top edge), so the
+  // marks either side of the crown ride above the head instead of over it.
+  // Its crown also has to clear the text box. The crown sits at
+  // H - 0.88P - ry, so it clears minTop while P <= (H - minTop - ry) / 0.88 —
+  // on a short phone the portrait shrinks rather than the halo being pushed
+  // down onto the face.
+  const minTop = boxY + boxH + 28 + lead / 2;
+  const tallRx = W / 2 - g - icon / 2;
+  const tallRy = tallRx * 0.6;
+  const full =
+    mode === "tall"
+      ? Math.min(W * 1.12, H * 0.6, (H - minTop - tallRy) / 0.88)
+      : mode === "dock"
+        ? dockP
+        : Math.min(H * 0.8, colW * 0.78);
+  const rest = tall
+    ? Math.min(W * 0.62, H * 0.34)
+    : Math.min(H * 0.42, W * 0.3);
+  const P = intro ? rest : full;
+  const headY = H - P + 0.3 * P;
+  // The intro is centred on the whole screen whatever the arrangement; the
+  // portrait slides into its column when the reel starts.
+  const px = intro ? W / 2 : sx;
+
+  const cx = sx;
+  let cy = headY;
+  let rx: number;
+  let ry: number;
+  if (tall) {
+    rx = tallRx;
+    ry = tallRy;
+    cy = Math.max(H - P + 0.12 * P, minTop + ry);
+  } else {
+    rx = Math.min(W * 0.34, 560, colW / 2 - icon / 2 - 12);
+    ry = Math.min(H * 0.3, P * 0.42);
+    cy = Math.max(cy, headerEnd + 24 + lead / 2 + ry);
+  }
+
+  /** A point on the ring at angle `a` (degrees, 90 = the crown). */
+  const at = (a: number) => {
+    const r = (a * Math.PI) / 180;
+    const sin = Math.sin(r);
+    const cos = Math.cos(r);
+    return { x: cx + rx * cos, y: cy - ry * sin, sin, cos };
+  };
+
+  /** Where mark i of section s sits when its section's focus is `focus`. The
+   *  ring wraps, so the set reads as a loop; a tall screen only shows the arc
+   *  either side of the crown, a wide one the whole ring with depth. */
+  const onRing = (s: number, i: number, focus: number) => {
+    const k = SECTIONS[s].marks.length;
+    let d = i - focus;
+    if (d >= k / 2) d -= k;
+    if (d < -k / 2) d += k;
+    const stepDeg = tall ? 34 : Math.min(360 / k, 52);
+    const p = at(90 - d * stepDeg);
+    const depth = (p.sin + 1) / 2;
+    const focused = d === 0;
+    let opacity = focused ? 1 : 0.45 + 0.4 * depth;
+    if (tall && Math.abs(d * stepDeg) > 80) opacity = 0;
+    return {
+      x: p.x,
+      y: p.y,
+      scale: focused ? 1 : (icon * (0.7 + 0.3 * depth)) / front,
+      opacity,
+      z: focused ? 6 : p.sin < -0.2 ? 1 : 4,
+      rot: focused ? 0 : -p.cos * 8,
+      focused,
+    };
+  };
+
+  const marks = SECTIONS.map((sec, s) =>
+    sec.marks.map((m, i) => {
+      if (st.kind === "mark" && st.s === s) {
+        return { ...onRing(s, i, st.i), live: true };
+      }
+      if (contact) {
+        const seat = RING.findIndex((r) => r.s === s && r.i === i);
+        if (seat >= 0) {
+          // The payoff: every mark scrolled past, collected into one ring.
+          const p = at(90 + seat * (360 / RING.length));
+          const depth = (p.sin + 1) / 2;
+          return {
+            x: p.x,
+            y: p.y,
+            scale: (lead * (0.75 + 0.35 * depth)) / front,
+            // A tall screen's halo sits on the hair, so its back half would
+            // peek around the face rather than hide behind it.
+            opacity: tall && p.sin < -0.2 ? 0 : 0.5 + 0.5 * depth,
+            z: p.sin < -0.2 ? 1 : 4,
+            rot: -p.cos * 8,
+            focused: false,
+            live: true,
+          };
+        }
+      }
+      // Off stage: parked where it will arrive, shrunk and invisible, so a
+      // section grows in place rather than flying in from a corner.
+      const park = onRing(s, i, 0);
+      return {
+        ...park,
+        scale: park.scale * 0.6,
+        opacity: 0,
+        focused: false,
+        live: false,
+      };
+    }),
+  );
+
+  const crownTop = cy - ry - front / 2;
+  const tailTop = boxY + boxH + 8;
+
+  return {
+    tall,
+    g,
+    front,
+    headerTop,
+    headerH,
+    box: { x: boxX, y: boxY, w: boxW },
+    portrait: { size: full, scale: P / full, x: px - full / 2 },
+    glow: { x: px, y: headY, size: P * 1.5 },
+    ring: { cx, cy, rx, ry },
+    marks,
+    tail:
+      tall && st.kind === "mark" && crownTop - 12 - tailTop > 12
+        ? { x: W / 2 - 1, y: tailTop, h: crownTop - 12 - tailTop }
+        : null,
+  };
+}
+
+/** A right-pointing arrow drawn on a 2px grid, so it reads as a sprite. */
+function PixelArrow({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 8 10" className={className}>
+      <path d="M1 0h2v2h2v2h2v2h-2v2h-2v2h-2z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Marks the flagship, drawn in the same pixel grid as the arrows. */
+function Crown() {
+  return (
+    <svg aria-hidden viewBox="0 0 11 8" className="halo-crown">
+      <path
+        d="M1 1h2v4h-2zM4.5 0h2v5h-2zM8 1h2v4h-2zM1 5h9v3h-9z"
+        fill="#ffd34d"
+      />
+      <path d="M2 6h1v1h-1zM5 6h1v1h-1zM8 6h1v1h-1z" fill="#e2463c" />
+    </svg>
+  );
+}
+
+const LINKS = [
+  { label: "Instagram", href: "https://instagram.com/baranidharan_b_" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/baranidharanb" },
+  // mailto, not a form: there is no backend here, and a link hands the reader
+  // straight to the client they already have.
+  { label: "Email", href: "mailto:baranidharan.balamurugan@travafa.com" },
+];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
 export function Hero() {
-  const [revealed, setRevealed] = useState(false);
-  // Bitmask over MARKS: bit i is set while mark i is hoverable. One number, so
-  // a scroll frame that changes nothing re-renders nothing.
-  const [live, setLive] = useState(0);
-  // Index of the mark whose card is opened for us, or -1. Only below lg:, where
-  // there is no pointer to hover with — see .mark-slot[data-auto] in globals.css.
-  const [auto, setAuto] = useState(-1);
-  // Whether the scroll has run out, which is the contact pill's cue.
-  const [ended, setEnded] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
-  const liveRef = useRef(0);
-  const autoRef = useRef(-1);
-  const endedRef = useRef(false);
+  const boxRef = useRef<HTMLElement>(null);
+  // Null until the stage has been measured: everything placed by layout() waits
+  // for a real size rather than flashing at a guessed one.
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const ready = size !== null;
+  const [step, setStep] = useState(0);
+  const [boxH, setBoxH] = useState(220);
+  const stepRef = useRef(0);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setRevealed(true), PORTRAIT_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Scroll writes one number, --sp (0..1), and CSS derives everything from it:
-  // the portrait's growth, which phase's label is showing, and which marks are
-  // on screen. The portrait is anchored to the bottom edge and scales from it,
-  // both in CSS, so there is no geometry to measure here.
+  // The stage's own box, not window.innerHeight: it is 100svh, which is what
+  // the portrait's bottom edge is actually anchored to on a phone.
   useEffect(() => {
     const el = stage.current;
     if (!el) return;
+    const ro = new ResizeObserver(() =>
+      setSize({ w: el.clientWidth, h: el.clientHeight }),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-    // Scroll at which the portrait finishes growing: the end of the first phase,
-    // so the growth is spent on the projects reveal and the two phases after it
-    // play against a portrait already at full size. Written here rather than as
-    // a style prop because this effect is the sole owner of the stage's inline
-    // custom properties — React would otherwise be diffing a style attribute
-    // that --sp is mutating behind its back.
-    el.style.setProperty("--grown-by", String(PHASES[0].to));
+  // The text box sizes itself to the tallest entry in its section (they share
+  // one grid cell), and the ring on a tall screen hangs under it — so its real
+  // height feeds back into the layout.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBoxH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
 
-    let forced = false;
+  // Scroll writes --sp for the rail and picks the step. A step only changes on
+  // a boundary, so a scroll frame inside one re-renders nothing.
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
     let frame = 0;
     const update = () => {
       frame = 0;
       const distance =
         document.documentElement.scrollHeight - window.innerHeight;
       const progress =
-        distance > 0 ? Math.min(1, Math.max(0, window.scrollY / distance)) : 0;
+        distance > 0 ? clamp(window.scrollY / distance, 0, 1) : 0;
       el.style.setProperty("--sp", progress.toFixed(4));
-
-      // Scrolling early is a request to see the thing — don't make them wait
-      // out the rest of the 3s for a portrait that is already growing.
-      if (!forced && progress > 0) {
-        forced = true;
-        setRevealed(true);
-      }
-
-      // Only a mark that has fully arrived and has not begun leaving accepts a
-      // hover, so a card can never be summoned by a mark nobody can see.
-      let mask = 0;
-      // The newest mark to have fully arrived — the one whose card opens itself
-      // on a touch screen. MARKS is ordered by reveal, so the highest live index
-      // is the latest arrival, and each new one takes the open card from the one
-      // before it.
-      let latest = -1;
-      for (let i = 0; i < MARKS.length; i++) {
-        const mark = MARKS[i];
-        if (progress >= mark.at + FADE_IN && progress < mark.end) {
-          mask |= 1 << i;
-          // Closed again once its set starts to leave. The card is the icon's
-          // sibling, not its child, so it does not inherit the exit fade — left
-          // open it would hang there as a solid panel over an empty stage for
-          // the whole handover to the next phase.
-          if (progress < mark.end - FADE_OUT) latest = i;
-        }
-      }
-      if (mask !== liveRef.current) {
-        liveRef.current = mask;
-        setLive(mask);
-      }
-      if (latest !== autoRef.current) {
-        autoRef.current = latest;
-        setAuto(latest);
-      }
-
-      // Hysteresis, so the pill cannot chatter on the last pixel of the scroll:
-      // it arrives at CONTACT_IN and only leaves once the reader has climbed
-      // back past CONTACT_OUT.
-      const end = endedRef.current
-        ? progress >= CONTACT_OUT
-        : progress >= CONTACT_IN;
-      if (end !== endedRef.current) {
-        endedRef.current = end;
-        setEnded(end);
+      const next = Math.min(
+        STEPS.length - 1,
+        Math.floor(progress * STEPS.length),
+      );
+      if (next !== stepRef.current) {
+        stepRef.current = next;
+        setStep(next);
       }
     };
-
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);
     };
-
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -437,244 +467,287 @@ export function Hero() {
     };
   }, []);
 
+  /** Scrolls to the middle of a step's band, so a tap lands squarely inside it
+   *  rather than on the knife edge between two. */
+  const goTo = useCallback((target: number) => {
+    const t = clamp(target, 0, STEPS.length - 1);
+    const distance = document.documentElement.scrollHeight - window.innerHeight;
+    const top =
+      t === 0
+        ? 0
+        : t === STEPS.length - 1
+          ? distance
+          : ((t + 0.5) / STEPS.length) * distance;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+  }, []);
+
+  const W = size?.w ?? 1440;
+  const H = size?.h ?? 900;
+  const L = layout(W, H, step, boxH);
+  const st = STEPS[step];
+  const section = st.kind === "mark" ? SECTIONS[st.s] : null;
+  const focus = st.kind === "mark" ? st.i : 0;
+  const level =
+    st.kind === "mark" ? st.s : st.kind === "contact" ? SECTIONS.length : -1;
+
   return (
-    <div
-      ref={stage}
-      data-revealed={revealed ? "" : undefined}
-      data-end={ended ? "" : undefined}
-      className="stage absolute inset-0"
-    >
-      {/* Background layer: behind the type and the portrait, above the wash.
-          The layer itself never takes pointer events — only live marks do.
-          Carries no z-index on purpose: a z-index here would make this a
-          stacking context and trap the hover cards inside it, under the portrait.
-          Without one, the marks still paint below the type and the portrait —
-          they are auto-level and come first in the DOM — while .mark-card can
-          raise itself above both. Nothing in this subtree may take a z-index. */}
-      <div className="pointer-events-none absolute inset-0">
-        {MARKS.map((mark, i) => {
-          const on = (live & (1 << i)) !== 0;
-          return (
-            <div
-              key={mark.slug}
-              data-live={on ? "" : undefined}
-              data-auto={i === auto ? "" : undefined}
-              data-lean={mark.slot.tilt < 0 ? "left" : "right"}
-              data-hug={mark.slot.hug}
-              className={`mark-slot absolute ${mark.slot.place}`}
-              style={
-                {
-                  "--at": mark.at,
-                  "--end": mark.end,
-                  "--tilt": `${mark.slot.tilt}deg`,
-                  ...(mark.slot.gap && { "--hug-gap": mark.slot.gap }),
-                } as CSSProperties
-              }
-              // Off the tab order while invisible, so tabbing never lands on a
-              // mark two phases away and opens its card over the wrong set.
-              tabIndex={on ? 0 : -1}
-            >
-              {/* The icon carries the scroll-driven reveal; the card is its
-                  sibling so it inherits neither the tilt nor the scale. The crown
-                  is inside it, so it does inherit both — it arrives with the mark
-                  it belongs to and leans at the same angle. */}
-              <div className="mark-icon">
-                {mark.crowned && <Crown />}
-                {mark.logo ? (
+    <div ref={stage} data-step={st.kind} className="stage absolute inset-0">
+      <div className="halo-intro" inert={st.kind !== "intro"}>
+        <h1 className="wordmark halo-wordmark">Baranidharan</h1>
+        <p className="halo-tagline">Turning ideas into cool apps</p>
+        <button type="button" onClick={() => goTo(1)} className="halo-start">
+          <PixelArrow className="halo-start-arrow" />
+          Press start
+        </button>
+        <p className="halo-or">or scroll</p>
+      </div>
+
+      {/* Everything below is placed by layout(), which needs the stage's real
+          size — so it mounts once that is measured, rather than rendering at a
+          guess on the server and jumping on hydration. */}
+      {size && (
+        <>
+          <span
+            aria-hidden
+            className="halo-glow"
+            style={{
+              width: L.glow.size,
+              height: L.glow.size,
+              transform: `translate3d(${r1(L.glow.x - L.glow.size / 2)}px, ${r1(L.glow.y - L.glow.size / 2)}px, 0)`,
+            }}
+          />
+
+          <svg aria-hidden className="halo-orbit" width={W} height={H}>
+            <ellipse
+              cx={L.ring.cx}
+              cy={L.ring.cy}
+              rx={L.ring.rx}
+              ry={L.ring.ry}
+            />
+          </svg>
+
+          {SECTIONS.map((sec, s) =>
+            sec.marks.map((m, i) => {
+              const p = L.marks[s][i];
+              const visible = p.live && p.opacity > 0;
+              return (
+                <button
+                  key={`${sec.key}-${m.slug}`}
+                  type="button"
+                  aria-label={m.name}
+                  aria-hidden={!visible}
+                  tabIndex={visible ? 0 : -1}
+                  data-focused={p.focused ? "" : undefined}
+                  data-live={visible ? "" : undefined}
+                  onClick={() => goTo(FIRST_STEP[s] + i)}
+                  className="halo-mark"
+                  style={{
+                    width: L.front,
+                    height: L.front,
+                    zIndex: p.z,
+                    opacity: p.opacity,
+                    transform: `translate3d(${r1(p.x - L.front / 2)}px, ${r1(p.y - L.front / 2)}px, 0) rotate(${r1(p.rot)}deg) scale(${r3(p.scale)})`,
+                  }}
+                >
                   <Image
-                    src={mark.logo}
+                    src={m.logo}
                     alt=""
                     width={1024}
                     height={1024}
-                    // Tracks --icon in globals.css: capped at 6.5rem from
-                    // ~1095px up, on the 9.5vw slope between there and 640px,
-                    // and pinned to the 4rem floor below that. Rounded up at
-                    // each step — over-estimating costs a slightly larger file,
-                    // under-estimating costs a soft one.
-                    sizes="(min-width: 1095px) 104px, (min-width: 640px) 10vw, 68px"
-                    className="mark-art block h-full w-full"
+                    sizes={`${Math.ceil(L.front)}px`}
+                    className="halo-mark-art"
                   />
-                ) : (
-                  <span
-                    aria-hidden
-                    className="mark-art mark-monogram"
-                    style={{ "--tint": mark.tint } as CSSProperties}
-                  >
-                    {initials(mark.name)}
-                  </span>
-                )}
-              </div>
+                  {p.focused && (
+                    <span aria-hidden className="halo-brackets">
+                      <span />
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                  )}
+                  {m.crowned && <Crown />}
+                </button>
+              );
+            }),
+          )}
 
-              <div className="mark-card">
-                <p className="mark-card-head">
-                  <span className="mark-card-name">{mark.name}</span>
-                  <span className="mark-card-meta">{mark.meta}</span>
-                </p>
-                <p className="mark-card-desc">{mark.desc}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* The scrollbar's replacement: a white column that fills top to bottom
-          with --sp. Reads that variable off the stage it sits in, so it costs
-          nothing per frame beyond the transform. Above everything, cards
-          included (30) — it is chrome, not content, and it lives in the strip of
-          edge nothing else occupies. */}
-      <div aria-hidden className="scroll-rail">
-        <span className="scroll-rail-fill" />
-      </div>
-
-      {/* Names the set on stage. Pinned near the top edge rather than left in
-          the eyebrow under the name: by the last phase the portrait has grown
-          up over that spot, and a label nobody can read is worse than none.
-          z-25 clears the portrait (20) but stays under the hover cards (30), so
-          a card opening near the top still wins the overlap.
-          Every label shares one grid cell, so the cell is as wide as the longest
-          of them and the rules either side hold still as the words cross-fade. */}
-      {/* Higher below lg:, where the marks arc across the band beneath it and
-          the crown of that arc needs the room. */}
-      <div className="phase-rail pointer-events-none absolute inset-x-0 top-[4%] z-[25] flex items-center justify-center px-5 lg:top-[7%]">
-        {/* Typography lives in .eyebrow, not here: a pixel face only stays
-            crisp at whole-pixel sizes, and Tailwind's type scale is in rem. */}
-        <p className="eyebrow">
-          {PHASES.map((phase, p) => (
-            <span
-              key={phase.key}
-              className="eyebrow-label"
-              style={
-                {
-                  "--from": phase.from,
-                  // The last label stays for the same reason its marks do.
-                  "--to": p === PHASES.length - 1 ? 9 : phase.to,
-                } as CSSProperties
-              }
-            >
-              {/* Each label carries its own rules rather than sharing a pair
-                  parked on the rail: on the beat between two phases every label
-                  is at zero, and shared rules would sit there framing nothing. */}
-              <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
-              <span className="eyebrow-word">{phase.label}</span>
-              <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
-            </span>
-          ))}
-        </p>
-      </div>
-
-      <div className="flex h-full flex-col items-center justify-center px-5 sm:px-6">
-        <div className="relative z-10">
-          {/* Lifts once the portrait lands, so the pair stays optically centred,
-              then recedes as the portrait grows over it. */}
-          <div className="type-lift flex flex-col items-center">
-            {/* The rise wrapper and the fade are separate elements on purpose:
-                .rise fills its animation forwards, so an opacity set on the same
-                element would never win against it. */}
-            <div className="rise" style={{ animationDelay: "80ms" }}>
-              <div className="scroll-hint flex items-center gap-4">
-                <span className="h-px w-8 bg-gradient-to-r from-transparent to-white/30 sm:w-12" />
-                <p className="font-mono text-[0.7rem] uppercase tracking-[0.42em] text-white/55 sm:text-xs">
-                  Scroll to Know More
-                </p>
-                <span className="h-px w-8 bg-gradient-to-l from-transparent to-white/30 sm:w-12" />
-              </div>
-            </div>
-
-            {/* "Baranidharan" is one unbreakable 12-character word that cannot
-                wrap, so it is sized by vw rather than a rem step. Measured at
-                this weight and tracking it renders 6.02x its font-size wide, so
-                12vw fills ~80% of the line box from 320px up — snug, never
-                clipped. The rise lives on the wrapper because .wordmark already
-                owns the element's animation slot for the sheen. */}
-            <div
-              className="rise mt-7 max-w-full"
-              style={{ animationDelay: "200ms" }}
-            >
-              <h1 className="wordmark text-center text-[clamp(1.75rem,12vw,12rem)] font-bold leading-[0.88] tracking-[-0.045em]">
-                Baranidharan
-              </h1>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Pinned to the bottom edge of the screen at every scroll position, and
-          above the type: scrolling only scales it, and it scales from that edge,
-          so it never leaves the bottom. */}
-      <div
-        aria-hidden
-        className="portrait-slot pointer-events-none absolute bottom-0 left-1/2 z-20 -translate-x-1/2"
-      >
-        <div className="portrait-grow">
-          <div className="portrait-in relative">
-            <span className="portrait-glow" />
-            {/* sizes tracks --target in globals.css — the width the portrait is
-                laid out at, which is the width it reaches fully grown. A
-                narrower hint would fetch a file the grown portrait outruns.
-                It omits --target's third cap (the one keeping a lane clear for
-                the hugging marks), so on the narrow viewports that cap bites it
-                over-estimates. That is the safe direction: a slightly larger
-                file, never a soft one. */}
+          {/* Laid out at its full size and scaled down for the intro, never laid
+          out small and scaled up: a composited layer is rasterised at its
+          untransformed size, so scaling down keeps it sharp. Scales from the
+          bottom edge, so it never leaves it. */}
+          <div
+            aria-hidden
+            className="halo-portrait"
+            style={{
+              width: L.portrait.size,
+              height: L.portrait.size,
+              transform: `translate3d(${r1(L.portrait.x)}px, ${r1(H - L.portrait.size)}px, 0) scale(${r3(L.portrait.scale)})`,
+            }}
+          >
             <Image
               src="/hero.png"
               alt=""
               width={1254}
               height={1254}
               loading="eager"
-              // Tracks --target in globals.css, which changes shape at lg:.
-              // Below that the portrait fills the width; above it, it steps back
-              // to 50vw to leave lanes for the marks. The lg: arm omits --target's
-              // third cap, so it over-estimates on the narrow viewports where
-              // that cap bites — the safe direction: a larger file, never a soft
-              // one.
-              sizes="(min-width: 1024px) min(115vh, max(50vw, 55vh)), min(115vh, max(100vw, 55vh))"
-              quality={90}
-              className="portrait-img h-auto w-full"
+              // Tracks layout()'s full size: min(112vw, 60vh) on a tall screen
+              // (narrower than 20:23), min(80vh, 48vw) on a wide one.
+              sizes="(max-aspect-ratio: 20/23) min(112vw, 60vh), min(80vh, 48vw)"
+              className="h-full w-full"
             />
           </div>
-        </div>
-      </div>
 
-      {/* The page's last word: three ways to reach him, floated in from the
-          bottom edge once the scroll runs out. The only interactive thing on the
-          page, so it is also the only thing that takes pointer events —
-          everything above is a reel you scroll, not a UI you click.
-          inert while hidden, which keeps the three links out of the tab order
-          and unclickable until the pill has actually arrived; the CSS below
-          handles the pointer on its own for anything that ignores the
-          attribute. */}
-      <nav
-        aria-label="Contact"
-        inert={!ended}
-        className="contact-pill"
-      >
-        {LINKS.map((link, i) => (
-          <div key={link.label} className="contact-item">
-            {/* Hairline between neighbours, not around each item: the divider
-                belongs to the gap, so the first one does without. */}
-            {i > 0 && <span aria-hidden className="contact-sep" />}
-            <a
-              className="contact-link"
-              href={link.href}
-              // mailto stays in place; the two profiles open away from the page.
-              {...(link.href.startsWith("http") && {
-                target: "_blank",
-                rel: "noreferrer noopener",
-              })}
-            >
-              <svg
-                aria-hidden
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="contact-icon"
-              >
-                {link.icon}
-              </svg>
-              {link.label}
-            </a>
-          </div>
-        ))}
-      </nav>
+          <header
+            className="halo-header"
+            inert={st.kind === "intro"}
+            style={{
+              left: L.g,
+              right: L.g,
+              top: L.headerTop,
+              height: L.headerH,
+            }}
+          >
+            <p className="halo-name">Baranidharan</p>
+            <nav aria-label="Sections" className="halo-levels">
+              {L.tall && (
+                <span className="halo-lv">
+                  LV {Math.max(1, Math.min(level + 1, SECTIONS.length))}/
+                  {SECTIONS.length}
+                </span>
+              )}
+              {SECTIONS.map((sec, s) => (
+                <button
+                  key={sec.key}
+                  type="button"
+                  aria-label={sec.label}
+                  aria-current={s === level ? "step" : undefined}
+                  data-state={s === level ? "on" : s < level ? "done" : "next"}
+                  onClick={() => goTo(FIRST_STEP[s])}
+                  className="halo-level"
+                >
+                  <span className="halo-level-bar" />
+                  {!L.tall && (
+                    <span className="halo-level-label">
+                      {pad2(s + 1)} {sec.short}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </header>
+
+          {L.tail && (
+            <span
+              aria-hidden
+              className="halo-tail"
+              style={{
+                height: r1(L.tail.h),
+                transform: `translate3d(${r1(L.tail.x)}px, ${r1(L.tail.y)}px, 0)`,
+              }}
+            />
+          )}
+
+          <section
+            ref={boxRef}
+            aria-live="polite"
+            inert={st.kind === "intro"}
+            className="halo-box"
+            style={{
+              width: L.box.w,
+              transform: `translate3d(${r1(L.box.x)}px, ${r1(L.box.y)}px, 0)`,
+            }}
+          >
+            {st.kind === "contact" ? (
+              <>
+                <div className="halo-box-row">
+                  <p className="halo-box-label">Continue?</p>
+                  <button
+                    type="button"
+                    onClick={() => goTo(0)}
+                    className="halo-replay"
+                  >
+                    Replay
+                  </button>
+                </div>
+                <h2 className="halo-box-name">Let&rsquo;s make the next one</h2>
+                <nav aria-label="Contact" className="halo-menu">
+                  {LINKS.map((link) => (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      {...(link.href.startsWith("http") && {
+                        target: "_blank",
+                        rel: "noreferrer noopener",
+                      })}
+                    >
+                      <PixelArrow className="halo-menu-cursor" />
+                      {link.label}
+                    </a>
+                  ))}
+                </nav>
+              </>
+            ) : (
+              <>
+                {/* Every entry of the section in one grid cell, only the current one
+                visible: the cell is as tall as the longest, so the box — and the
+                ring hung under it — holds still while you step through. */}
+                <div className="halo-entries">
+                  {(section ?? SECTIONS[0]).marks.map((m, i) => (
+                    <div
+                      key={m.slug}
+                      className="halo-entry"
+                      data-on={i === focus ? "" : undefined}
+                      aria-hidden={i !== focus}
+                    >
+                      <div className="halo-box-row">
+                        <p className="halo-box-label">
+                          {(section ?? SECTIONS[0]).label}
+                        </p>
+                        <span className="halo-box-meta">{m.meta}</span>
+                      </div>
+                      <h2 className="halo-box-name">{m.name}</h2>
+                      <p className="halo-box-desc">{m.desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="halo-box-foot">
+                  <span className="halo-count">
+                    {pad2(focus + 1)} /{" "}
+                    {pad2((section ?? SECTIONS[0]).marks.length)}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      aria-label="Previous"
+                      onClick={() => goTo(step - 1)}
+                      className="halo-nav"
+                    >
+                      <PixelArrow className="halo-nav-arrow -scale-x-100" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next"
+                      onClick={() => goTo(step + 1)}
+                      className="halo-nav halo-nav-next"
+                    >
+                      <PixelArrow className="halo-nav-arrow" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </>
+      )}
+
+      {/* The scrollbar's replacement: a column that fills top to bottom with
+          --sp. Above everything — it is chrome, not content. */}
+      <div aria-hidden className="scroll-rail">
+        <span className="scroll-rail-fill" />
+      </div>
     </div>
   );
 }

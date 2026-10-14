@@ -1,12 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #060608;
-  --foreground: #fafafa;
-  /* Ink of the bitmap HUD — the phase label at the top of the stage and the
-     type inside every hover card. One token because they are one system; change
-     it here and both follow. */
-  --card-ink: #fff6c2;
+  --background: #0b0806;
+  --foreground: #f3ece6;
+  /* The palette is lifted from the portrait's shirt, so the HUD and the figure
+     read as one picture. --orange is the frame and every "on" state; --amber the
+     lighter accent type; --rust the outlines; --cocoa the text box's fill. */
+  --orange: #f08a24;
+  --amber: #ffb25b;
+  --rust: #8a3a12;
+  --cocoa: #24120a;
+  --cream: #fff1e0;
+  --tan: #e8c3a3;
+  --dust: #b98c6e;
 }
 
 @theme inline {
@@ -39,27 +45,27 @@ body {
 }
 
 ::selection {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(240, 138, 36, 0.3);
 }
 
 /* --- Atmosphere ---------------------------------------------------------- */
 
-/* Slow-drifting colour wash behind the name. */
+/* Slow-drifting colour wash, in the portrait's warm range. */
 .atmosphere {
   background:
     radial-gradient(
       ellipse 55% 50% at 50% -8%,
-      rgba(124, 122, 255, 0.4),
+      rgba(240, 138, 36, 0.22),
       transparent 72%
     ),
     radial-gradient(
       ellipse 48% 42% at 10% 92%,
-      rgba(56, 189, 248, 0.26),
+      rgba(180, 80, 26, 0.2),
       transparent 72%
     ),
     radial-gradient(
       ellipse 42% 38% at 90% 86%,
-      rgba(232, 74, 200, 0.22),
+      rgba(255, 178, 91, 0.12),
       transparent 72%
     );
   animation: drift 22s ease-in-out infinite alternate;
@@ -88,7 +94,7 @@ body {
   background: radial-gradient(
     ellipse 75% 65% at 50% 45%,
     transparent 40%,
-    rgba(6, 6, 8, 0.75) 100%
+    rgba(11, 8, 6, 0.75) 100%
   );
 }
 
@@ -100,309 +106,409 @@ body {
 
 /* --- Type --------------------------------------------------------------- */
 
-/* Bright silver base with a white band sweeping across it. The floor stays
-   high so the name never dips to a dull grey mid-animation. */
+/* Bright base with a white band sweeping across it. The floor stays high so
+   the name never dips to a dull grey mid-animation. */
 .wordmark {
   background-image: linear-gradient(
     105deg,
-    #e4e4ee 0%,
-    #e4e4ee 32%,
+    #eee6de 0%,
+    #eee6de 32%,
     #ffffff 50%,
-    #e4e4ee 68%,
-    #e4e4ee 100%
+    #eee6de 68%,
+    #eee6de 100%
   );
   background-size: 260% 100%;
   background-position: 100% 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 70px rgba(150, 148, 255, 0.28));
+  filter: drop-shadow(0 0 70px rgba(240, 138, 36, 0.25));
   animation: sheen 9s ease-in-out infinite;
 }
 
-/* --- Phase label --------------------------------------------------------- */
-
-/* The resting invitation under the name. Gone by the time the first phase label
-   arrives, so the two are never legible at once. Fades as a row — hairlines
-   included — because it frames nothing once the words are gone. */
-.scroll-hint {
-  opacity: clamp(0, calc(1 - var(--sp) / 0.03), 1);
-}
-
-/* One grid cell for every phase label, so the cell measures the longest of them
-   and nothing shifts as the words hand over.
-   Set in the same bitmap face as the hover cards: the label names a set and the
-   cards describe its members, so the two should read as one HUD rather than as
-   two typographic systems that happen to share a page. */
-.eyebrow {
-  display: grid;
-  align-items: center;
-  justify-items: center;
-  white-space: nowrap;
+/* Bitmap face shared by the whole HUD. Silkscreen is drawn on an 8px grid, so
+   its sizes and leading stay in whole pixels — a rem would land the glyphs
+   off-grid — and smoothing is off because the glyphs are already the right
+   shape. */
+.halo-start,
+.halo-box-name,
+.halo-menu a {
   font-family: var(--font-pixel), ui-monospace, monospace;
-  /* Bitmap glyphs are already the right shape — smoothing only rounds off the
-     corners the face was drawn with. */
   -webkit-font-smoothing: none;
-  /* Silkscreen is drawn on an 8px grid, so size, leading and tracking are all
-     whole pixels: a rem or an em would land the glyphs off-grid and fur their
-     edges, which is the one thing a pixel face cannot survive. */
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 2px;
+}
+
+/* Small mono caps: labels, counters, the tagline. */
+.halo-tagline,
+.halo-or,
+.halo-lv,
+.halo-level-label,
+.halo-box-label,
+.halo-box-meta,
+.halo-count,
+.halo-replay {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
   text-transform: uppercase;
-  color: var(--card-ink);
-  /* Hard shadow, no blur — the same trick the card frame and its type use. */
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
-/* letter-spacing adds its space after the last glyph too, which would leave the
-   right-hand rule sitting one tracking-step further out than the left. Pulling
-   it back keeps the pair symmetric about the word. */
-.eyebrow-word {
-  margin-right: -2px;
+/* --- Stage --------------------------------------------------------------- */
+
+/* JS writes --sp (scroll progress 0..1) for the rail, and places everything
+   else with inline transforms from layout() in hero.tsx. Every placed element
+   sits at the stage's top-left and is moved by transform alone, so a step
+   change is a composited transition, never a reflow. */
+.stage {
+  --sp: 0;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@media (min-width: 640px) {
-  .eyebrow {
-    font-size: 16px;
-    line-height: 20px;
-    letter-spacing: 3px;
-  }
-
-  .eyebrow-word {
-    margin-right: -3px;
-  }
+.halo-glow,
+.halo-orbit,
+.halo-mark,
+.halo-portrait,
+.halo-tail,
+.halo-box {
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
-.eyebrow > * {
-  grid-area: 1 / 1;
+.halo-glow {
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(240, 138, 36, 0.26),
+    rgba(180, 80, 26, 0.1) 62%,
+    transparent
+  );
+  transition: transform 0.6s var(--ease), width 0.6s var(--ease), height 0.6s var(--ease);
+  pointer-events: none;
 }
 
-/* Same in/out shape as a mark, offset by 0.03 to clear the hint. --to is set
-   past 1 on the last phase, which pins its label for the rest of the scroll. */
-.eyebrow-label {
-  --in: clamp(0, calc((var(--sp) - var(--from, 0) - 0.03) / 0.06), 1);
-  --out: clamp(0, calc((var(--to, 9) - var(--sp)) / 0.05), 1);
-  opacity: min(var(--in), var(--out));
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+/* The ring itself: a dashed ellipse the marks ride. Hidden on the intro, where
+   the marks have not arrived yet. */
+.halo-orbit {
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.halo-orbit ellipse {
+  fill: none;
+  stroke: rgba(255, 178, 91, 0.24);
+  stroke-width: 2;
+  stroke-dasharray: 2 10;
+  transition: all 0.55s var(--ease);
+}
+
+[data-step="intro"] .halo-orbit {
+  opacity: 0;
 }
 
 /* --- Marks --------------------------------------------------------------- */
 
-/* A mark is one logo plus its hover card — an app, an employer, a school. The
-   slot holds both. JS marks it [data-live] for exactly the stretch where the
-   logo is fully arrived and not yet leaving, which is the only state that
-   accepts a hover. */
-.mark-slot {
-  width: var(--icon);
+.halo-mark {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 23%;
+  transform-origin: center;
+  transition:
+    transform 0.55s var(--ease),
+    opacity 0.4s ease;
+  will-change: transform, opacity;
+}
+
+.halo-mark:not([data-live]) {
   pointer-events: none;
 }
 
-.mark-slot[data-live] {
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.mark-slot:focus {
-  outline: none;
-}
-
-/* Slots that sit beside the portrait are placed against its actual edge rather
-   than at a fixed percentage of the screen. The portrait's width is --target,
-   which tracks the viewport on its own curve, so a percentage that clears it at
-   one size sits inside it at another — at tablet widths the shoulders swallowed
-   the two bottom marks whole. Only from lg: up, because below that every slot
-   sits in the band above the name and the portrait fills the width anyway.
-   max() keeps a mark on screen in the degenerate case where the portrait is
-   wide enough to leave no gutter at all; there it rides the transparent corner
-   of the cut-out rather than being pushed off the edge. */
-@media (min-width: 1024px) {
-  .mark-slot[data-hug="left"] {
-    left: max(
-      0.75rem,
-      calc(var(--gutter) - var(--icon) - var(--hug-gap, 0.75rem))
-    );
-    right: auto;
-  }
-
-  .mark-slot[data-hug="right"] {
-    right: max(
-      0.75rem,
-      calc(var(--gutter) - var(--icon) - var(--hug-gap, 0.75rem))
-    );
-    left: auto;
-  }
-}
-
-/* Two independent ramps: --in fades the mark up over its own 0.09 slice from
-   --at, staggered so a phase arrives one mark at a time; --out fades the whole
-   set down over the 0.05 before --end, so they leave together and the next
-   phase gets a clean stage. Opacity takes whichever ramp is lower. The exit
-   also drifts upward rather than back down, so leaving never looks like the
-   entrance played backwards. */
-.mark-icon {
-  --in: clamp(0, calc((var(--sp) - var(--at, 0)) / 0.09), 1);
-  --out: clamp(0, calc((var(--end, 9) - var(--sp)) / 0.05), 1);
-  opacity: calc(min(var(--in), var(--out)) * 0.92);
-  transform: translate3d(
-      0,
-      calc((1 - var(--in)) * 1.25rem - (1 - var(--out)) * 1.5rem),
-      0
-    )
-    rotate(var(--tilt, 0deg)) scale(calc(0.86 + 0.14 * var(--in)));
-  will-change: opacity, transform;
-}
-
-/* --- Crown --------------------------------------------------------------- */
-
-/* Sits on top of the icon, overlapping its top edge. Absolutely positioned
-   against .mark-icon, which is already a containing block because it has a
-   transform — position: relative is here to say so out loud, not to add
-   anything. */
-.mark-icon {
-  position: relative;
-}
-
-.mark-crown {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  /* Just over half the icon, measured off --icon rather than inherited type. */
-  font-size: calc(var(--icon) * 0.56);
-  line-height: 1;
-  /* The emoji is the art, so name the colour fonts outright — the page's own
-     face has no crown glyph, and an unlucky fallback is a tofu box. */
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-  /* Overlaps the artwork so the band rests on the icon's top edge rather than
-     floating above it. Shallow on purpose: it sits in front now, so every extra
-     percent covers artwork instead of hiding behind it. Part of this is spent on
-     the em box's bottom bearing, which puts the glyph higher than the box. */
-  transform: translate(-50%, 18%);
-  transform-origin: bottom center;
-  /* No z-index needed to sit on top of the icon: a positioned element paints
-     above a static sibling whatever the DOM order, and the artwork is static. */
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Rides the same lift as the artwork — otherwise the icon slides out from under
-   the crown on hover. */
-.mark-slot[data-live]:hover .mark-crown,
-.mark-slot[data-live]:focus-visible .mark-crown {
-  transform: translate(-50%, 18%) translateY(-0.3rem) scale(1.07);
+.halo-mark:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 6px;
 }
 
 /* Store artwork ships square — the rounding is the platform's job, so it is
-   this page's job here. Company and school logos get the same tile, so all
-   three phases read as one set of objects rather than three treatments. */
-.mark-art {
-  border-radius: 23%;
-  box-shadow: 0 18px 42px -14px rgba(0, 0, 0, 0.8);
-  transition:
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 220ms ease;
-}
-
-/* Stands in until a logo file exists: initials on a tinted tile, cut to the
-   same silhouette as real artwork so a half-sourced phase still looks composed
-   rather than broken. */
-.mark-monogram {
-  display: grid;
-  place-items: center;
+   this page's job here. Logos get the same tile, so every section reads as one
+   set of objects. */
+.halo-mark-art {
+  display: block;
   width: 100%;
-  /* Not height: 100% — the slot is only as tall as its content, so a percentage
-     height here resolves to auto and the tile collapses to one line of type.
-     Real artwork holds the square open with its own intrinsic ratio; this has
-     to say so. */
-  aspect-ratio: 1;
-  background:
-    linear-gradient(150deg, var(--tint, #2a2a4d), rgba(10, 10, 22, 0.95));
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 18px 42px -14px rgba(0, 0, 0, 0.8);
-  font-family: var(--font-geist-sans), sans-serif;
-  /* Measured off --icon, not inherited type: the tile scales with the slot. */
-  font-size: calc(var(--icon) * 0.34);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.85);
-  user-select: none;
+  height: 100%;
+  border-radius: 23%;
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.8);
 }
 
-/* Hover lifts the artwork, not the icon: the icon's transform belongs to the
-   scroll, and a transition on it would lag every scroll frame. */
-.mark-slot[data-live]:hover .mark-art,
-.mark-slot[data-live]:focus-visible .mark-art {
-  transform: translateY(-0.3rem) scale(1.07);
-  box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.9);
-}
-
-/* That hover replaces box-shadow wholesale, which would take the monogram's
-   ring with it. Same specificity, later in the file, so it wins. */
-.mark-slot[data-live]:hover .mark-monogram,
-.mark-slot[data-live]:focus-visible .mark-monogram {
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 22px 50px -12px rgba(0, 0, 0, 0.9);
-}
-
-/* --- Hover card: 32-bit dialog box --------------------------------------- */
-
-/* Everything here is a whole multiple of --px, the card's notion of one pixel.
-   Break the grid and the frame stops looking drawn and starts looking scaled.
-   Deliberately absent: border-radius, backdrop blur, blurred shadows, easing
-   curves, sub-pixel type sizes — each one is the opposite of a bitmap look. */
-.mark-card {
-  /* One knob for the whole card: frame weight, bevel, padding, gap, gutter and
-     shadow offset are all multiples of it. Raise it to scale the chrome, and
-     raise the type sizes below by the same step to keep the two in proportion. */
-  --px: 5px;
-  --card-frame: #efedff;
-
+/* Pixel selection corners around the mark at the crown — the one the text box
+   is describing. */
+.halo-brackets > span {
   position: absolute;
-  /* Above the wordmark (10) and the grown portrait (20), which would otherwise
-     paint over the card and make a solid panel look see-through. This only
-     works because no ancestor between here and the sticky section takes a
-     z-index — see the layer comment in hero.tsx. */
-  z-index: 30;
-  top: calc(100% + 3 * var(--px));
-  width: max-content;
-  /* The vw arm only binds on a phone, and it is what keeps the card on screen
-     there. A card is anchored to its mark's near edge and grows away from it, so
-     the widest it can ever be without running off is (100vw - the mark's inset).
-     The arc's crown pair sits at a 20% inset — furthest in of any slot — so 70vw
-     clears it with room to spare, and every slot outboard of that by more. Above
-     phone widths 22rem is the smaller of the two and nothing changes. */
-  max-width: min(22rem, 70vw);
-  padding: calc(3 * var(--px)) calc(4 * var(--px));
-  font-family: var(--font-pixel), ui-monospace, monospace;
-  /* Bitmap glyphs are already the right shape — smoothing only rounds off the
-     corners the face was drawn with. */
-  -webkit-font-smoothing: none;
-  /* Traces the notched silhouette below rather than a box, because it reads the
-     rendered alpha. Zero blur: a retro shadow is an offset copy, not a haze. */
-  filter: drop-shadow(var(--px) var(--px) 0 rgba(0, 0, 0, 0.85));
+  width: 14px;
+  height: 14px;
+  border: 0 solid var(--amber);
+}
+
+.halo-brackets > span:nth-child(1) {
+  left: -12px;
+  top: -12px;
+  border-width: 4px 0 0 4px;
+}
+
+.halo-brackets > span:nth-child(2) {
+  right: -12px;
+  top: -12px;
+  border-width: 4px 4px 0 0;
+}
+
+.halo-brackets > span:nth-child(3) {
+  left: -12px;
+  bottom: -12px;
+  border-width: 0 0 4px 4px;
+}
+
+.halo-brackets > span:nth-child(4) {
+  right: -12px;
+  bottom: -12px;
+  border-width: 0 4px 4px 0;
+}
+
+.halo-crown {
+  position: absolute;
+  left: 50%;
+  top: -30%;
+  width: 46%;
+  transform: translateX(-50%);
+  shape-rendering: crispEdges;
+}
+
+/* --- Portrait ------------------------------------------------------------ */
+
+.halo-portrait {
+  z-index: 2;
+  transform-origin: bottom center;
+  pointer-events: none;
+  filter: saturate(1.06) drop-shadow(0 22px 55px rgba(0, 0, 0, 0.55));
+  transition: transform 0.6s var(--ease), width 0.6s var(--ease), height 0.6s var(--ease);
+  animation: rise 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.35s backwards;
+}
+
+/* --- Header -------------------------------------------------------------- */
+
+/* The name moves up here once the intro is over, so the portrait can grow
+   without ever covering it. */
+.halo-header {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: opacity 0.4s ease, transform 0.5s var(--ease);
+}
+
+[data-step="intro"] .halo-header {
   opacity: 0;
-  transform: translateY(calc(-2 * var(--px)));
-  /* Stepped, not eased — motion lands on frames, like a sprite. */
-  transition:
-    opacity 120ms steps(3),
-    transform 140ms steps(3);
-  /* The card must never intercept the hover that is keeping it open. */
+  transform: translateY(-0.75rem);
+}
+
+.halo-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.halo-levels {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.halo-lv {
+  margin-right: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--dust);
+}
+
+/* One button per section: a bar on a phone, a bar and its name on a wide
+   screen. 44px tall either way, so it is a real touch target. */
+.halo-level {
+  display: flex;
+  min-width: 44px;
+  min-height: 44px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.halo-level-bar {
+  display: block;
+  width: 20px;
+  height: 8px;
+  border: 2px solid var(--rust);
+  transition: background-color 0.3s steps(3), border-color 0.3s steps(3);
+}
+
+.halo-level-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #9a7a64;
+}
+
+.halo-level[data-state="on"] .halo-level-bar {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+
+.halo-level[data-state="done"] .halo-level-bar {
+  background: rgba(240, 138, 36, 0.45);
+  border-color: var(--orange);
+}
+
+.halo-level[data-state="on"] .halo-level-label {
+  color: var(--amber);
+}
+
+.halo-level:hover .halo-level-label,
+.halo-level:focus-visible .halo-level-label {
+  color: var(--cream);
+}
+
+/* Three 44px tabs and the name leave no room for the counter on a 320px
+   screen; the bars alone still say where you are. */
+@media (max-width: 359px) {
+  .halo-lv {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .halo-name {
+    font-size: 20px;
+  }
+
+  .halo-level-bar {
+    width: 56px;
+  }
+}
+
+/* --- Intro --------------------------------------------------------------- */
+
+.halo-intro {
+  position: absolute;
+  inset-inline: 0;
+  top: 28%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 0 16px;
+  text-align: center;
+  transition: opacity 0.4s ease, transform 0.5s var(--ease);
+  animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
+}
+
+.stage:not([data-step="intro"]) .halo-intro {
+  opacity: 0;
+  transform: translateY(-1.5rem);
+}
+
+/* "Baranidharan" is one unbreakable 12-character word, so it is sized by vw:
+   at this weight and tracking it renders ~6x its font-size wide, so 12.5vw
+   fills ~75% of the line from 320px up — snug, never clipped. */
+.halo-wordmark {
+  font-size: clamp(2.5rem, 12.5vw, 11rem);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+}
+
+.halo-tagline {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--dust);
+}
+
+.halo-start {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 0 20px;
+  border: 2px solid var(--orange);
+  background: var(--cocoa);
+  color: var(--amber);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.halo-start:hover,
+.halo-start:focus-visible {
+  background: var(--orange);
+  color: var(--cocoa);
+}
+
+.halo-start-arrow {
+  width: 10px;
+  height: 12px;
+  transform: rotate(90deg);
+  animation: blink 1s steps(1) infinite;
+}
+
+.halo-or {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: #8f6f5a;
+}
+
+/* --- Text box ------------------------------------------------------------ */
+
+/* Dashed lead from the text box down to the mark it describes — tall screens
+   only, where the two are stacked. */
+.halo-tail {
+  z-index: 5;
+  width: 0;
+  border-left: 2px dashed rgba(255, 178, 91, 0.6);
+  transition: transform 0.55s var(--ease), height 0.55s var(--ease);
   pointer-events: none;
 }
 
-/* Two stacked notched plates make the frame: ::before is the full-size light
-   plate, ::after is the dark fill inset by one pixel on each side, leaving the
-   frame showing as an even one-pixel ring with stepped corners. A border can't
-   do this — clip-path would cut its corners away and leave the ring open. */
-.mark-card::before,
-.mark-card::after {
+/* A 32-bit dialog box. Everything is a whole multiple of --px, the box's notion
+   of one pixel; break that grid and the frame stops looking drawn. Two stacked
+   notched plates make the frame — ::before the full orange plate, ::after the
+   dark fill inset one pixel — because a border can't keep stepped corners. */
+.halo-box {
+  --px: 5px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(4 * var(--px));
+  /* Zero-blur drop shadow traces the notched silhouette — a retro shadow is an
+     offset copy, not a haze. It also makes the box a stacking context, which is
+     what lets the plates below sit at z-index -1 behind its own text. */
+  filter: drop-shadow(var(--px) var(--px) 0 rgba(0, 0, 0, 0.85));
+  transition: transform 0.55s var(--ease), opacity 0.4s ease;
+}
+
+[data-step="intro"] .halo-box {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.halo-box::before,
+.halo-box::after {
   content: "";
   position: absolute;
-  /* Each corner loses one pixel, which is what makes it read as drawn. */
+  z-index: -1;
   clip-path: polygon(
     var(--px) 0,
     calc(100% - var(--px)) 0,
@@ -417,420 +523,233 @@ body {
     0 var(--px),
     var(--px) var(--px)
   );
-  /* Behind the text, which stays in flow. Safe because the drop-shadow filter
-     on .mark-card makes it a stacking context, so a negative level here can only
-     go behind the card's own text, never behind the page. */
-  z-index: -1;
 }
 
-.mark-card::before {
+.halo-box::before {
   inset: 0;
-  background: var(--card-frame);
+  background: var(--orange);
 }
 
-.mark-card::after {
+.halo-box::after {
   inset: var(--px);
-  /* Fully opaque, and the flat colour underneath guarantees it: the card sits
-     over the portrait now, so any alpha here would show a face through the
-     panel. Only the bitten-out corners are ever see-through. */
-  background-color: #16162f;
-  background-image:
-    /* CRT scanlines, one pixel on and two off. */
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.05) 0 1px,
-      transparent 1px 3px
-    ),
-    linear-gradient(155deg, #26264f, #0e0e22);
-  /* Lit from the top left: the bevel that dates the whole thing to 1994. */
+  background-color: var(--cocoa);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.035) 0 1px,
+    transparent 1px 3px
+  );
+  /* A rust inner ring, then the top-left bevel that dates it to 1994. */
   box-shadow:
-    inset var(--px) var(--px) 0 rgba(255, 255, 255, 0.16),
-    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.45);
+    inset 0 0 0 2px var(--rust),
+    inset var(--px) var(--px) 0 2px rgba(255, 178, 91, 0.08),
+    inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.4);
 }
 
-/* Hangs off the side the icon leans towards, so it never runs off the screen
-   edge. The icon keeps its tilt; the card does not follow it any more — a
-   rotated bitmap frame is a resampled bitmap frame, and the stepped corners and
-   one-pixel ring are exactly what the resampling smears. */
-.mark-slot[data-lean="left"] .mark-card {
-  left: 0;
+/* Every entry in one cell, only the current one visible, so the cell is as
+   tall as the longest entry and the box never resizes mid-section. */
+.halo-entries {
+  display: grid;
 }
 
-.mark-slot[data-lean="right"] .mark-card {
-  right: 0;
+.halo-entry {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  visibility: hidden;
 }
 
-.mark-slot[data-live]:hover .mark-card,
-.mark-slot[data-live]:focus-visible .mark-card {
-  opacity: 1;
-  transform: none;
+.halo-entry[data-on] {
+  visibility: visible;
 }
 
-/* Below lg: there is nothing to hover with, so the card opens itself: the scroll
-   is the pointer. JS sets [data-auto] on the newest mark to have fully arrived
-   and moves it to the next one as that arrives, so exactly one card is ever open
-   and the set reads itself out as you scroll past it. Above lg: this is off —
-   there the reader has a pointer, and three or four cards' worth of panels
-   opening unbidden either side of the portrait is noise, not information. */
-@media (max-width: 1023px) {
-  .mark-slot[data-auto] .mark-card {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.mark-card-head {
+.halo-box-row {
   display: flex;
   align-items: baseline;
-  gap: calc(3 * var(--px));
-  /* Wraps rather than running out of the frame. An app name fits on one line,
-     but an employer or an institution — "Christ College of Engineering and
-     Technology" — easily outruns the card's measure, and nowrap would push it
-     straight through the bevel. */
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-/* Silkscreen is drawn on an 8px grid, so whole multiples of 8 land dead on its
-   own pixels — 16px for the name is the sharpest size the face has to offer. */
-.mark-card-name {
+.halo-box-label {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--amber);
+}
+
+.halo-box-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--amber);
+}
+
+.halo-box-name {
   font-size: 16px;
   line-height: 20px;
   font-weight: 700;
-  color: var(--card-ink);
-  /* Hard shadow under the type, the way a tile-based UI would ship it — the
-     same trick as the frame's, at glyph scale. */
+  color: var(--cream);
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
-.mark-card-meta {
-  margin-left: auto;
-  font-size: 12px;
-  line-height: 20px;
-  color: #6de5f5;
-  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
-}
-
-.mark-card-desc {
-  margin-top: calc(2 * var(--px));
-  /* Pixel faces have their own built-in spacing, so the leading is set in whole
-     pixels rather than a ratio that would land the baseline off-grid. */
-  font-size: 12px;
-  line-height: 19px;
-  color: #b9b6e6;
-  /* The description is the one line that wraps, and a bitmap face needs a
-     shorter measure than a proportional one to stay readable. */
-  max-width: 24ch;
-  white-space: normal;
-}
-
-/* --- Portrait ------------------------------------------------------------ */
-
-/* Laid out at the grown width and held down to a third by .portrait-grow, not
-   laid out small and scaled up. A composited layer is rasterised once at its
-   untransformed size, so a layer that scales up stretches that one bitmap —
-   visibly soft mid-scroll, and only sharp again if the browser re-rasters.
-   Scaling down instead means the bitmap always has more pixels than the screen
-   is asking for. The drop-shadow on .portrait-img makes this load-bearing: a
-   filter forces its own raster, so it would blur with the image. */
-.portrait-slot {
-  width: var(--target);
-}
-
-/* No bottom fade is needed: the cut-out is cropped at the chest, and that crop
-   line sits on the bottom edge of the screen at every scroll position, so the
-   screen edge does the hiding. */
-.portrait-img {
-  filter: saturate(1.06) drop-shadow(0 22px 55px rgba(0, 0, 0, 0.55));
-}
-
-/* Warm halo that ties the orange portrait back into the cool wash. */
-.portrait-glow {
-  position: absolute;
-  inset: 8% -18% -6%;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at 50% 45%,
-    rgba(255, 138, 61, 0.22),
-    rgba(124, 122, 255, 0.14) 55%,
-    transparent 76%
-  );
-  filter: blur(28px);
-}
-
-/* Hidden until the stage flips to revealed, then eases up out of the dark.
-   Scales from the bottom too, so the entrance never lifts it off the edge. */
-.portrait-in {
-  opacity: 0;
-  transform-origin: bottom center;
-}
-
-[data-revealed] .portrait-in {
-  animation: portrait-in 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* --- Contact pill -------------------------------------------------------- */
-
-/* The page's closing line. It arrives on a boolean and a transition rather than
-   on an --sp ramp like everything else here, and that is the point: the reel is
-   scrubbed, this has landed. JS owning the one boolean is also what lets the
-   links be untabbable and unclickable until it is really on screen.
-   Typeset in mono micro-caps, the same voice as the "Scroll to Know More" hint
-   at the top — the invitation the page opens with and the reply it closes on. */
-.contact-pill {
-  position: absolute;
-  left: 50%;
-  bottom: 1.25rem;
-  /* Clear of the scroll rail (40) and the hover cards (30): once it arrives it
-     is the frontmost thing on the page, and the only one that takes a click. */
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  /* Never wider than the screen it floats on. */
-  max-width: calc(100% - 1.5rem);
-  padding: 0.375rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  /* Opaque enough to lift mono caps off the portrait's shirt, which is what sits
-     behind the pill at the end of the scroll. */
-  background: rgba(10, 10, 18, 0.72);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  backdrop-filter: blur(14px) saturate(1.2);
-  box-shadow:
-    0 18px 40px -18px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  opacity: 0;
-  /* Parked below the bottom edge. The -50% arm is the centring, so the slide has
-     to be written as part of the same transform rather than beside it. */
-  transform: translate(-50%, calc(100% + 1.5rem));
-  transition:
-    opacity 380ms ease,
-    transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-}
-
-[data-end] .contact-pill {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-}
-
-/* Carries the divider so the link itself stays a clean pill-shaped hit area. */
-.contact-item {
-  display: flex;
-  align-items: center;
-}
-
-.contact-sep {
-  width: 1px;
-  height: 1.15rem;
-  flex: none;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.contact-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
+.halo-box-desc {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--tan);
+}
+
+.halo-box-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.halo-count {
+  font-size: 12px;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
-  /* Three peers, so none of them shouts; white is reserved for the one under
-     the pointer. */
-  color: rgba(255, 255, 255, 0.72);
-  white-space: nowrap;
-  transition:
-    color 180ms ease,
-    background-color 180ms ease;
+  color: var(--dust);
 }
 
-.contact-link:hover,
-.contact-link:focus-visible {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+.halo-nav {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid var(--rust);
+  color: var(--amber);
+  cursor: pointer;
 }
 
-.contact-link:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.55);
-  outline-offset: 1px;
+.halo-nav:hover,
+.halo-nav:focus-visible {
+  border-color: var(--amber);
 }
 
-.contact-icon {
-  width: 1rem;
-  height: 1rem;
+.halo-nav-next {
+  border-color: var(--amber);
+  background: var(--orange);
+  color: var(--cocoa);
+}
+
+.halo-nav-next:hover,
+.halo-nav-next:focus-visible {
+  background: var(--amber);
+}
+
+.halo-nav-arrow {
+  width: 10px;
+  height: 12px;
+  shape-rendering: crispEdges;
+}
+
+.halo-replay {
+  min-height: 32px;
+  padding: 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--dust);
+  cursor: pointer;
+}
+
+.halo-replay:hover,
+.halo-replay:focus-visible {
+  color: var(--amber);
+}
+
+/* The contact links as a game menu: the cursor and the highlight follow the
+   pointer or the focus, and rest on the first item when neither is in the
+   menu. */
+.halo-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.halo-menu a {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  font-size: 16px;
+  color: var(--foreground);
+}
+
+.halo-menu-cursor {
+  width: 8px;
+  height: 10px;
   flex: none;
+  visibility: hidden;
+  shape-rendering: crispEdges;
 }
 
-/* Tightened rather than truncated: all three labels still read on a 320px
-   screen, which is narrower than anything that ships. */
-@media (max-width: 420px) {
-  .contact-link {
-    gap: 0.35rem;
-    padding: 0.4rem 0.5rem;
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
+.halo-menu a:hover,
+.halo-menu a:focus-visible,
+.halo-menu:not(:hover, :focus-within) a:first-child {
+  outline: none;
+  background: var(--orange);
+  color: var(--cocoa);
+}
+
+.halo-menu a:hover .halo-menu-cursor,
+.halo-menu a:focus-visible .halo-menu-cursor,
+.halo-menu:not(:hover, :focus-within) a:first-child .halo-menu-cursor {
+  visibility: visible;
+}
+
+@media (min-width: 640px) {
+  .halo-box-name {
+    font-size: 24px;
+    line-height: 30px;
+  }
+
+  .halo-box-desc {
+    font-size: 15px;
+    line-height: 22px;
   }
 }
 
 /* --- Scroll rail --------------------------------------------------------- */
 
-/* Stands in for the scrollbar the page just hid. Lives inside .stage, so it
-   inherits --sp and needs no JS of its own; the stage is pinned for the whole
-   scroll, so an absolutely-positioned rail in it reads as fixed to the edge.
-   Hard against the right edge on purpose: the outermost mark slot sits at a 3%
-   inset, and anything further in than this would sit under it. */
+/* Stands in for the scrollbar the page hid. Lives inside .stage, so it inherits
+   --sp; the stage is pinned for the whole scroll, so it reads as fixed. */
 .scroll-rail {
   position: absolute;
   top: 0;
   bottom: 0;
   right: 0;
   z-index: 40;
-  /* Capped by the room the edge actually has: the outermost mark slot sits at a
-     3% inset, which is only ~11px on a phone, so a rail much wider than this
-     starts sitting under a logo. */
-  width: 5px;
-  background: rgba(255, 255, 255, 0.08);
+  width: 4px;
+  background: rgba(255, 255, 255, 0.06);
   pointer-events: none;
 }
 
 @media (min-width: 640px) {
   .scroll-rail {
-    width: 8px;
+    width: 6px;
   }
 }
 
-/* scaleY off the top edge rather than an animated height: a transform composites
-   and a height reflows, and this updates on every scroll frame. */
+/* scaleY off the top edge rather than an animated height: a transform
+   composites and a height reflows, and this updates on every scroll frame. */
 .scroll-rail-fill {
   position: absolute;
   inset: 0;
   transform-origin: top center;
   transform: scaleY(var(--sp));
-  background: #ffffff;
-  /* Enough glow to read as light against the dark page without becoming a
-     second gradient in a page that already has several. */
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
+  background: var(--orange);
+  box-shadow: 0 0 12px rgba(240, 138, 36, 0.55);
   will-change: transform;
 }
 
-/* --- Scroll ------------------------------------------------------------- */
+/* --- Motion -------------------------------------------------------------- */
 
-/* JS writes --sp (scroll progress 0..1) on .stage; everything else is derived. */
-.stage {
-  --sp: 0;
-  /* A mark's width. Lives here rather than on .mark-slot because --target is
-     sized against it below, and it is inherited by every slot, crown and
-     monogram that measures itself off the icon. Set in length, not a
-     percentage: the crown reads it as a font-size, where a percentage would
-     resolve against the inherited type size instead of the icon's width. */
-  /* The slope is what sizes a phone and a tablet: 7vw sat under the old 3rem
-     floor on anything narrower than ~686px, so every phone got the smallest
-     mark on offer while a desktop got the largest. A steeper slope off a higher
-     floor grows the small and middle widths and leaves the wide ones alone —
-     from ~1095px up this still tops out at the same 6.5rem it always did. */
-  --icon: clamp(4rem, 9.5vw, 6.5rem);
-  /* Width the portrait grows to. Below lg: it fills the width and then some —
-     every mark sits in the band above the name down here, so there is nothing
-     beside the portrait for it to cover, and a tablet was otherwise left with a
-     73%-wide portrait under a lot of empty sky. 100%, not 100vw: vw counts the
-     scrollbar and would bleed the portrait past both edges.
-     The 62vh floor is what fills a phone, where 100% is the smaller of the two
-     and would leave the portrait sitting in the bottom half under a band of
-     empty sky. It bleeds the width off both edges, which is the intent — a
-     cropped portrait, not a small figure floating in the dark. Raising it much
-     past here starts swallowing the wordmark whole rather than riding over it:
-     68vh left only the last two letters showing on a phone.
-     Still capped at 115vh so a short screen cannot push the face off the top. */
-  --target: min(max(100%, 62vh), 115vh);
-  /* How far the portrait has grown, 0..1. It finishes with the first phase
-     rather than with the scroll: the growth belongs to the projects reveal, and
-     the two phases after it are read against a portrait already at full size.
-     --grown-by is that phase's end, set inline from PHASES[0].to so the ramp
-     and the phase table cannot drift apart. */
-  --pg: clamp(0, calc(var(--sp) / var(--grown-by, 1)), 1);
-  /* Clear space between one screen edge and the portrait's edge, once it has
-     grown. 100%, not 100vw: the page scrolls, so vw counts a scrollbar the
-     portrait is not centred within, and the marks would be placed that much
-     too far in. Resolved where it is used, against the mark layer's width. */
-  --gutter: max(0px, calc((100% - var(--target)) / 2));
-}
-
-/* From lg: up the marks leave the band above the name and take up positions
-   either side of the portrait, so the portrait has to make room for them: back
-   to a 50vw base, plus a third cap reserving a lane one mark wide and its margin
-   on each side. Without that cap a viewport taller than roughly 1.8x its width
-   lets the 55vh floor span the portrait edge to edge, closing --gutter to zero
-   and leaving the hugging marks nowhere to stand. */
-@media (min-width: 1024px) {
-  .stage {
-    --target: min(
-      max(50vw, 55vh),
-      115vh,
-      calc(100% - 2 * (var(--icon) + 1.5rem))
-    );
-  }
-}
-
-/* Triples the portrait from its resting third of --target up to --target.
-   Written as thirds of the full width so the scale tops out at 1 and never
-   exceeds it — see .portrait-slot. The origin is the bottom edge, which is the
-   screen's bottom edge, so it stays anchored there at every size. */
-.portrait-grow {
-  transform: scale(calc((1 + 2 * var(--pg)) / 3));
-  transform-origin: bottom center;
-  will-change: transform;
-}
-
-/* --- Entrance ----------------------------------------------------------- */
-
-.rise {
-  animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Type block gives up a little height so name and portrait read as one unit,
-   then settles back as the portrait rides over it. Keyed to --pg, not --sp:
-   the recession answers the portrait's growth, so it has to finish when the
-   growth does rather than keep dimming through the last two phases. */
-.type-lift {
-  /* Nothing in this block is interactive — a display wordmark and a scroll
-     hint — and its box is far wider than the glyphs that are visible in it. Left
-     hit-testable it silently eats the hover on any mark that reaches it, which
-     is what happened to the top marks once they grew: the card simply never
-     opened, with nothing on screen to explain why. */
-  pointer-events: none;
-  opacity: calc(1 - 0.32 * var(--pg));
-  transition: transform 1.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-[data-revealed] .type-lift {
-  transform: translateY(clamp(-2.75rem, -5.5vh, -1.25rem));
-}
-
-@keyframes portrait-in {
-  from {
-    opacity: 0;
-    transform: translateY(2.5rem) scale(0.94);
-    filter: blur(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: blur(0);
-  }
-}
-
+/* Moves with `translate`, not `transform`, and is only ever filled backwards:
+   the elements it lifts are placed by inline transforms and hidden by opacity
+   rules, and a forwards fill on either property would pin them there for good. */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(1.25rem);
+    translate: 0 1.25rem;
     filter: blur(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: blur(0);
   }
 }
 
@@ -853,46 +772,31 @@ body {
   }
 }
 
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .atmosphere,
   .wordmark,
-  .rise,
-  [data-revealed] .portrait-in {
+  .halo-intro,
+  .halo-portrait,
+  .halo-start-arrow {
     animation: none;
   }
   .wordmark {
     background-position: 50% 0;
   }
-  .rise {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-  /* Portrait still waits its 3s, but arrives as a plain fade. */
-  .portrait-in {
-    transition: opacity 600ms linear;
-  }
-  [data-revealed] .portrait-in {
-    opacity: 1;
-  }
-  .type-lift {
-    transform: none;
-    transition: none;
-  }
-  /* Marks still arrive and leave on scroll — that is the content — but only by
-     fading, with no lift, scale or exit drift. */
-  .mark-icon {
-    transform: rotate(var(--tilt, 0deg));
-  }
-  /* The card still appears, without the step-in. */
-  .mark-card {
-    transform: none;
-    transition: opacity 120ms linear;
-  }
-  /* The pill still arrives — it is the only way to reach him — but it fades in
-     where it belongs instead of sliding up to it. */
-  .contact-pill {
-    transform: translate(-50%, 0);
-    transition: opacity 240ms linear;
+  /* Steps still change — that is the content — but by cutting, not gliding. */
+  .halo-glow,
+  .halo-orbit ellipse,
+  .halo-mark,
+  .halo-tail,
+  .halo-box,
+  .halo-header,
+  .halo-intro {
+    transition: opacity 0.2s linear;
   }
 }
