@@ -1,18 +1,68 @@
 @import "tailwindcss";
 
+/* The HUD's palette, one set per section. The ring is the same for the whole
+   reel; what tells the sections apart is colour. Each set has the same seven
+   roles:
+   --accent    the frame and every "on" state
+   --accent-hi lighter accent type: labels, dates, arrows
+   --accent-lo outlines and the inner ring
+   --panel     the text box's fill
+   --ink / --ink-2 / --ink-3  headline, body and muted type
+   Built wears the portrait's own orange, so the first thing on screen reads as
+   one picture with the figure. Registered with @property so a section change
+   cross-fades the whole page instead of cutting. */
+@property --accent { syntax: "<color>"; inherits: true; initial-value: #f08a24; }
+@property --accent-hi { syntax: "<color>"; inherits: true; initial-value: #ffb25b; }
+@property --accent-lo { syntax: "<color>"; inherits: true; initial-value: #8a3a12; }
+@property --panel { syntax: "<color>"; inherits: true; initial-value: #24120a; }
+@property --ink { syntax: "<color>"; inherits: true; initial-value: #fff1e0; }
+@property --ink-2 { syntax: "<color>"; inherits: true; initial-value: #e8c3a3; }
+@property --ink-3 { syntax: "<color>"; inherits: true; initial-value: #b98c6e; }
+@property --background { syntax: "<color>"; inherits: true; initial-value: #0b0806; }
+
 :root {
   --background: #0b0806;
   --foreground: #f3ece6;
-  /* The palette is lifted from the portrait's shirt, so the HUD and the figure
-     read as one picture. --orange is the frame and every "on" state; --amber the
-     lighter accent type; --rust the outlines; --cocoa the text box's fill. */
-  --orange: #f08a24;
-  --amber: #ffb25b;
-  --rust: #8a3a12;
-  --cocoa: #24120a;
-  --cream: #fff1e0;
-  --tan: #e8c3a3;
-  --dust: #b98c6e;
+  --accent: #f08a24;
+  --accent-hi: #ffb25b;
+  --accent-lo: #8a3a12;
+  --panel: #24120a;
+  --ink: #fff1e0;
+  --ink-2: #e8c3a3;
+  --ink-3: #b98c6e;
+  transition:
+    --accent 0.7s ease,
+    --accent-hi 0.7s ease,
+    --accent-lo 0.7s ease,
+    --panel 0.7s ease,
+    --ink 0.7s ease,
+    --ink-2 0.7s ease,
+    --ink-3 0.7s ease,
+    --background 0.7s ease;
+}
+
+/* Where I've worked: a cool cyan, the orange's opposite on the wheel. */
+:root[data-theme="worked"] {
+  --background: #060a0d;
+  --accent: #36c2e8;
+  --accent-hi: #8fe3ff;
+  --accent-lo: #1d5f7a;
+  --panel: #0a1a24;
+  --ink: #e6f8ff;
+  --ink-2: #b5d8e6;
+  --ink-3: #7fa6b8;
+}
+
+/* Where I studied: violet. */
+:root[data-theme="studied"] {
+  --background: #08070d;
+  --accent: #a07bff;
+  --accent-hi: #cdb8ff;
+  --accent-lo: #4b3290;
+  --panel: #150f2a;
+  --ink: #f1ebff;
+  --ink-2: #cfc3ee;
+  --ink-3: #9a8cc0;
 }
 
 @theme inline {
@@ -45,7 +95,7 @@ body {
 }
 
 ::selection {
-  background: rgba(240, 138, 36, 0.3);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* --- Atmosphere ---------------------------------------------------------- */
@@ -55,17 +105,17 @@ body {
   background:
     radial-gradient(
       ellipse 55% 50% at 50% -8%,
-      rgba(240, 138, 36, 0.22),
+      color-mix(in srgb, var(--accent) 22%, transparent),
       transparent 72%
     ),
     radial-gradient(
       ellipse 48% 42% at 10% 92%,
-      rgba(180, 80, 26, 0.2),
+      color-mix(in srgb, var(--accent-lo) 20%, transparent),
       transparent 72%
     ),
     radial-gradient(
       ellipse 42% 38% at 90% 86%,
-      rgba(255, 178, 91, 0.12),
+      color-mix(in srgb, var(--accent-hi) 12%, transparent),
       transparent 72%
     );
   animation: drift 22s ease-in-out infinite alternate;
@@ -94,7 +144,7 @@ body {
   background: radial-gradient(
     ellipse 75% 65% at 50% 45%,
     transparent 40%,
-    rgba(11, 8, 6, 0.75) 100%
+    color-mix(in srgb, var(--background) 75%, transparent) 100%
   );
 }
 
@@ -122,7 +172,7 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 0 70px rgba(240, 138, 36, 0.25));
+  filter: drop-shadow(0 0 70px color-mix(in srgb, var(--accent) 25%, transparent));
   animation: sheen 9s ease-in-out infinite;
 }
 
@@ -176,8 +226,8 @@ body {
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
-    rgba(240, 138, 36, 0.26),
-    rgba(180, 80, 26, 0.1) 62%,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    color-mix(in srgb, var(--accent-lo) 10%, transparent) 62%,
     transparent
   );
   transition: transform 0.6s var(--ease), width 0.6s var(--ease), height 0.6s var(--ease);
@@ -195,14 +245,9 @@ body {
 
 .halo-orbit ellipse {
   fill: none;
-  stroke: rgba(255, 178, 91, 0.24);
+  stroke: color-mix(in srgb, var(--accent-hi) 24%, transparent);
   stroke-width: 2;
   stroke-dasharray: 2 10;
-  transition: all 0.55s var(--ease);
-}
-
-[data-step="intro"] .halo-orbit {
-  opacity: 0;
 }
 
 /* --- Marks --------------------------------------------------------------- */
@@ -214,18 +259,15 @@ body {
   cursor: pointer;
   border-radius: 23%;
   transform-origin: center;
-  transition:
-    transform 0.55s var(--ease),
-    opacity 0.4s ease;
+  /* Placed every frame by placeRing() in hero.tsx — no CSS transition, which
+     would lag a frame behind the scroll. Hidden until its first frame writes
+     a real position. */
+  opacity: 0;
   will-change: transform, opacity;
 }
 
-.halo-mark:not([data-live]) {
-  pointer-events: none;
-}
-
 .halo-mark:focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--accent-hi);
   outline-offset: 6px;
 }
 
@@ -241,12 +283,21 @@ body {
 }
 
 /* Pixel selection corners around the mark at the crown — the one the text box
-   is describing. */
+   is describing. Every mark carries a set; only the crowned one shows it. */
+.halo-brackets {
+  opacity: 0;
+  transition: opacity 0.25s steps(3);
+}
+
+.halo-mark[data-crowned] .halo-brackets {
+  opacity: 1;
+}
+
 .halo-brackets > span {
   position: absolute;
   width: 14px;
   height: 14px;
-  border: 0 solid var(--amber);
+  border: 0 solid var(--accent-hi);
 }
 
 .halo-brackets > span:nth-child(1) {
@@ -329,12 +380,18 @@ body {
   white-space: nowrap;
   font-size: 11px;
   letter-spacing: 0.2em;
-  color: var(--dust);
+  color: var(--ink-3);
 }
 
 /* One button per section: a bar on a phone, a bar and its name on a wide
-   screen. 44px tall either way, so it is a real touch target. */
+   screen. 44px tall either way, so it is a real touch target.
+   Each tab keeps its own section's colour whatever section is showing, so the
+   three read as a legend for the theme rather than one tinted strip. The
+   values are that section's --accent, --accent-hi and --accent-lo. */
 .halo-level {
+  --tab: #f08a24;
+  --tab-hi: #ffb25b;
+  --tab-lo: #8a3a12;
   display: flex;
   min-width: 44px;
   min-height: 44px;
@@ -346,37 +403,48 @@ body {
   cursor: pointer;
 }
 
+.halo-level[data-section="worked"] {
+  --tab: #36c2e8;
+  --tab-hi: #8fe3ff;
+  --tab-lo: #1d5f7a;
+}
+
+.halo-level[data-section="studied"] {
+  --tab: #a07bff;
+  --tab-hi: #cdb8ff;
+  --tab-lo: #4b3290;
+}
+
 .halo-level-bar {
   display: block;
   width: 20px;
   height: 8px;
-  border: 2px solid var(--rust);
+  border: 2px solid var(--tab-lo);
   transition: background-color 0.3s steps(3), border-color 0.3s steps(3);
 }
 
 .halo-level-label {
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: #9a7a64;
+  color: var(--tab-hi);
+  opacity: 0.55;
+  transition: opacity 0.3s steps(3);
 }
 
 .halo-level[data-state="on"] .halo-level-bar {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--tab);
+  border-color: var(--tab);
 }
 
 .halo-level[data-state="done"] .halo-level-bar {
-  background: rgba(240, 138, 36, 0.45);
-  border-color: var(--orange);
+  background: color-mix(in srgb, var(--tab) 45%, transparent);
+  border-color: var(--tab);
 }
 
-.halo-level[data-state="on"] .halo-level-label {
-  color: var(--amber);
-}
-
+.halo-level[data-state="on"] .halo-level-label,
 .halo-level:hover .halo-level-label,
 .halo-level:focus-visible .halo-level-label {
-  color: var(--cream);
+  opacity: 1;
 }
 
 /* Three 44px tabs and the name leave no room for the counter on a 320px
@@ -399,10 +467,12 @@ body {
 
 /* --- Intro --------------------------------------------------------------- */
 
+/* High enough on a wide screen that the portrait's miniature halo stays clear
+   of the start button; a tall screen has the room to sit it lower. */
 .halo-intro {
   position: absolute;
   inset-inline: 0;
-  top: 28%;
+  top: 22%;
   z-index: 3;
   display: flex;
   flex-direction: column;
@@ -412,6 +482,12 @@ body {
   text-align: center;
   transition: opacity 0.4s ease, transform 0.5s var(--ease);
   animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
+}
+
+@media (max-aspect-ratio: 20/23) {
+  .halo-intro {
+    top: 28%;
+  }
 }
 
 .stage:not([data-step="intro"]) .halo-intro {
@@ -432,7 +508,7 @@ body {
 .halo-tagline {
   font-size: 12px;
   letter-spacing: 0.22em;
-  color: var(--dust);
+  color: var(--ink-3);
 }
 
 .halo-start {
@@ -442,9 +518,9 @@ body {
   gap: 12px;
   margin-top: 12px;
   padding: 0 20px;
-  border: 2px solid var(--orange);
-  background: var(--cocoa);
-  color: var(--amber);
+  border: 2px solid var(--accent);
+  background: var(--panel);
+  color: var(--accent-hi);
   font-size: 16px;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -452,8 +528,8 @@ body {
 
 .halo-start:hover,
 .halo-start:focus-visible {
-  background: var(--orange);
-  color: var(--cocoa);
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .halo-start-arrow {
@@ -466,7 +542,7 @@ body {
 .halo-or {
   font-size: 11px;
   letter-spacing: 0.3em;
-  color: #8f6f5a;
+  color: var(--ink-3);
 }
 
 /* --- Text box ------------------------------------------------------------ */
@@ -476,14 +552,14 @@ body {
 .halo-tail {
   z-index: 5;
   width: 0;
-  border-left: 2px dashed rgba(255, 178, 91, 0.6);
+  border-left: 2px dashed color-mix(in srgb, var(--accent-hi) 60%, transparent);
   transition: transform 0.55s var(--ease), height 0.55s var(--ease);
   pointer-events: none;
 }
 
 /* A 32-bit dialog box. Everything is a whole multiple of --px, the box's notion
    of one pixel; break that grid and the frame stops looking drawn. Two stacked
-   notched plates make the frame — ::before the full orange plate, ::after the
+   notched plates make the frame — ::before the full accent plate, ::after the
    dark fill inset one pixel — because a border can't keep stepped corners. */
 .halo-box {
   --px: 5px;
@@ -527,21 +603,21 @@ body {
 
 .halo-box::before {
   inset: 0;
-  background: var(--orange);
+  background: var(--accent);
 }
 
 .halo-box::after {
   inset: var(--px);
-  background-color: var(--cocoa);
+  background-color: var(--panel);
   background-image: repeating-linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.035) 0 1px,
     transparent 1px 3px
   );
-  /* A rust inner ring, then the top-left bevel that dates it to 1994. */
+  /* An accent-lo inner ring, then the top-left bevel that dates it to 1994. */
   box-shadow:
-    inset 0 0 0 2px var(--rust),
-    inset var(--px) var(--px) 0 2px rgba(255, 178, 91, 0.08),
+    inset 0 0 0 2px var(--accent-lo),
+    inset var(--px) var(--px) 0 2px color-mix(in srgb, var(--accent-hi) 8%, transparent),
     inset calc(-1 * var(--px)) calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.4);
 }
 
@@ -573,20 +649,20 @@ body {
 .halo-box-label {
   font-size: 11px;
   letter-spacing: 0.22em;
-  color: var(--amber);
+  color: var(--accent-hi);
 }
 
 .halo-box-meta {
   flex: none;
   font-size: 12px;
-  color: var(--amber);
+  color: var(--accent-hi);
 }
 
 .halo-box-name {
   font-size: 16px;
   line-height: 20px;
   font-weight: 700;
-  color: var(--cream);
+  color: var(--ink);
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
 
@@ -594,7 +670,7 @@ body {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 13px;
   line-height: 19px;
-  color: var(--tan);
+  color: var(--ink-2);
 }
 
 .halo-box-foot {
@@ -606,7 +682,7 @@ body {
 .halo-count {
   font-size: 12px;
   letter-spacing: 0.18em;
-  color: var(--dust);
+  color: var(--ink-3);
 }
 
 .halo-nav {
@@ -614,25 +690,25 @@ body {
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 2px solid var(--rust);
-  color: var(--amber);
+  border: 2px solid var(--accent-lo);
+  color: var(--accent-hi);
   cursor: pointer;
 }
 
 .halo-nav:hover,
 .halo-nav:focus-visible {
-  border-color: var(--amber);
+  border-color: var(--accent-hi);
 }
 
 .halo-nav-next {
-  border-color: var(--amber);
-  background: var(--orange);
-  color: var(--cocoa);
+  border-color: var(--accent-hi);
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .halo-nav-next:hover,
 .halo-nav-next:focus-visible {
-  background: var(--amber);
+  background: var(--accent-hi);
 }
 
 .halo-nav-arrow {
@@ -646,13 +722,13 @@ body {
   padding: 0 4px;
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: var(--dust);
+  color: var(--ink-3);
   cursor: pointer;
 }
 
 .halo-replay:hover,
 .halo-replay:focus-visible {
-  color: var(--amber);
+  color: var(--accent-hi);
 }
 
 /* The contact links as a game menu: the cursor and the highlight follow the
@@ -685,8 +761,8 @@ body {
 .halo-menu a:focus-visible,
 .halo-menu:not(:hover, :focus-within) a:first-child {
   outline: none;
-  background: var(--orange);
-  color: var(--cocoa);
+  background: var(--accent);
+  color: var(--panel);
 }
 
 .halo-menu a:hover .halo-menu-cursor,
@@ -735,8 +811,8 @@ body {
   inset: 0;
   transform-origin: top center;
   transform: scaleY(var(--sp));
-  background: var(--orange);
-  box-shadow: 0 0 12px rgba(240, 138, 36, 0.55);
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
   will-change: transform;
 }
 
@@ -791,8 +867,6 @@ body {
   }
   /* Steps still change — that is the content — but by cutting, not gliding. */
   .halo-glow,
-  .halo-orbit ellipse,
-  .halo-mark,
   .halo-tail,
   .halo-box,
   .halo-header,
